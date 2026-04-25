@@ -27,9 +27,14 @@ _last_sweep: float = 0.0
 
 
 def _client_key(request: Request) -> str:
-    api_key = request.headers.get("x-api-key")
-    if api_key:
-        return f"k:{api_key}"
+    # Trust the X-API-Key as a bucket discriminator only when auth is enabled
+    # AND the value is in the allowed set. Otherwise an attacker could rotate
+    # the header on every request and rent a fresh quota each time.
+    allowed = {key.strip() for key in settings.app_api_keys if key and key.strip()}
+    if allowed:
+        api_key = request.headers.get("x-api-key")
+        if api_key and api_key in allowed:
+            return f"k:{api_key}"
     if request.client and request.client.host:
         return f"ip:{request.client.host}"
     return "anon"

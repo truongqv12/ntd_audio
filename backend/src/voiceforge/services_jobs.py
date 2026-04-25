@@ -317,6 +317,13 @@ def reap_stale_jobs(db: Session, max_runtime_seconds: int) -> int:
                 row.updated_at = now
     db.commit()
     logger.warning("reaped_stale_jobs count=%s max_runtime_seconds=%s", len(stale_jobs), max_runtime_seconds)
+    # Publish after commit so SSE consumers see a state-change event and the
+    # in-flight gauge decrements for each reaped job.
+    for job in stale_jobs:
+        publish_jobs_changed(
+            "job_failed",
+            payload={"job_id": job.id, "provider_key": job.provider_key, "reaped": True},
+        )
     return len(stale_jobs)
 
 
