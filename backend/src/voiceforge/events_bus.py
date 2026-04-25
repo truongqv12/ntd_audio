@@ -29,16 +29,27 @@ logger = logging.getLogger(__name__)
 CHANNEL = "voiceforge:jobs"
 
 _warned: dict[str, bool] = {"sync": False}
+_sync_client_cache: dict[str, redis.Redis | None] = {}
 
 
 def _sync_client() -> redis.Redis | None:
+    """Return a lazily-built module-level Redis client (or None if unreachable).
+
+    Reusing a single client avoids leaking a fresh ``ConnectionPool`` on every
+    job state transition.
+    """
+    if "client" in _sync_client_cache:
+        return _sync_client_cache["client"]
     try:
-        return redis.Redis.from_url(settings.redis_url, decode_responses=True)
+        client = redis.Redis.from_url(settings.redis_url, decode_responses=True)
     except Exception as exc:
         if not _warned["sync"]:
             logger.warning("events_bus_sync_unavailable url=%s err=%s", settings.redis_url, exc)
             _warned["sync"] = True
+        _sync_client_cache["client"] = None
         return None
+    _sync_client_cache["client"] = client
+    return client
 
 
 def publish_jobs_changed(reason: str, *, payload: dict | None = None) -> None:
@@ -51,6 +62,8 @@ def publish_jobs_changed(reason: str, *, payload: dict | None = None) -> None:
         client.publish(CHANNEL, body)
     except Exception as exc:
         logger.warning("events_bus_publish_failed reason=%s err=%s", reason, exc)
+        # Drop the cached client so the next call rebuilds it after a transient outage.
+        _sync_client_cache.pop("client", None)
 
 
 async def subscribe_jobs_changed(heartbeat_seconds: float = 15.0) -> AsyncIterator[dict]:
@@ -73,13 +86,11 @@ async def subscribe_jobs_changed(heartbeat_seconds: float = 15.0) -> AsyncIterat
 
     try:
         while True:
-            try:
-                message = await asyncio.wait_for(
-                    pubsub.get_message(ignore_subscribe_messages=True), timeout=heartbeat_seconds
-                )
-            except TimeoutError:
-                yield {"reason": "heartbeat"}
-                continue
+            # redis-py's get_message blocks up to ``timeout`` seconds when no
+            # message is pending; passing 0/None would hot-spin the loop.
+            message = await pubsub.get_message(
+                ignore_subscribe_messages=True, timeout=heartbeat_seconds
+            )
             if message is None:
                 yield {"reason": "heartbeat"}
                 continue

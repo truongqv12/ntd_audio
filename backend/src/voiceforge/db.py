@@ -1,7 +1,7 @@
 import logging
 from collections.abc import Generator
 
-from sqlalchemy import create_engine
+from sqlalchemy import Engine, create_engine
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
@@ -14,7 +14,7 @@ class Base(DeclarativeBase):
     pass
 
 
-def _build_engine() -> object:
+def _build_engine() -> Engine:
     url = settings.database_url
     # In-memory sqlite needs a single shared connection across threads/sessions
     # so the schema lives long enough for TestClient + fixtures to share it.

@@ -36,7 +36,7 @@ function authHeaders(extra?: HeadersInit): HeadersInit {
 }
 
 function apiFetch(path: string, init: RequestInit = {}): Promise<Response> {
-  return apiFetch(`${path}`, { ...init, headers: authHeaders(init.headers) });
+  return fetch(`${API_BASE}${path}`, { ...init, headers: authHeaders(init.headers) });
 }
 
 export { API_BASE };
@@ -60,8 +60,8 @@ export async function updateProviderCredentials(
   providerKey: string,
   fields: Record<string, unknown>,
 ): Promise<import("./types").ProviderCredential> {
-  const response = await fetch(
-    `${API_BASE}/settings/provider-credentials/${encodeURIComponent(providerKey)}`,
+  const response = await apiFetch(
+    `/settings/provider-credentials/${encodeURIComponent(providerKey)}`,
     {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
@@ -301,8 +301,8 @@ export async function fetchMonitorLogSources(): Promise<LogSource[]> {
 }
 
 export async function fetchMonitorLogs(source = "api", limit = 200): Promise<LogTail> {
-  const response = await fetch(
-    `${API_BASE}/monitor/logs?source=${encodeURIComponent(source)}&limit=${limit}`,
+  const response = await apiFetch(
+    `/monitor/logs?source=${encodeURIComponent(source)}&limit=${limit}`,
   );
   if (!response.ok) throw new Error("Unable to fetch logs");
   return response.json();
