@@ -2,6 +2,7 @@ import { memo, useMemo, useState } from "react";
 import type { Job } from "../types";
 import { Panel } from "../components/Panel";
 import { JobTable } from "../components/JobTable";
+import { InlineAudioPlayer } from "../components/InlineAudioPlayer";
 import { LiveEventList } from "../components/LiveEventList";
 import { useI18n } from "../i18n";
 
@@ -56,12 +57,7 @@ export const JobsPage = memo(function JobsPage({
           </div>
         }
       >
-        <JobTable
-          jobs={visibleJobs}
-          onSelect={onSelectJob}
-          onCancel={onCancelJob}
-          onRetry={onRetryJob}
-        />
+        <JobTable jobs={visibleJobs} onSelect={onSelectJob} onCancel={onCancelJob} onRetry={onRetryJob} />
       </Panel>
 
       <Panel title={t("jobsPage.detailTitle")} description={t("jobsPage.detailDescription")}>
@@ -74,6 +70,12 @@ export const JobsPage = memo(function JobsPage({
               <span>{selectedJob.output_format}</span>
             </div>
             <p className="muted-copy">{selectedJob.source_text}</p>
+            {selectedJob.artifact ? (
+              <InlineAudioPlayer
+                downloadUrl={selectedJob.artifact.download_url}
+                mimeType={selectedJob.artifact.mime_type}
+              />
+            ) : null}
             <pre className="code-block">{JSON.stringify(selectedJob.normalized_params, null, 2)}</pre>
             <LiveEventList events={selectedJob.events} compact />
           </div>

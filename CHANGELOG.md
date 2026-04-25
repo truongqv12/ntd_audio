@@ -17,6 +17,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Tooling & quality gate (Epic 2).** Ruff + Black + Mypy configured in `backend/pyproject.toml`; ESLint + Prettier + Vitest configured in `frontend/`. Pre-commit hooks (`.pre-commit-config.yaml`). GitHub Actions CI runs lint, typecheck, and tests for both stacks on every PR. Initial smoke-test suites: 11 pytest + 8 vitest cases.
 - **Encryption-at-rest for provider secrets.** `APP_ENCRYPTION_KEY` (Fernet) transparently encrypts secret-flagged fields in `app_settings.value_json` on write and decrypts on read; legacy plaintext rows continue to read cleanly during the rollout window.
 - `CHANGELOG.md`, `scripts/bump_version.sh`, and `.github/workflows/release.yml` for tag-driven releases.
+- **Feature gaps (Epic 3).**
+  - `POST /jobs/{id}/cancel` and `POST /jobs/{id}/retry` so users can stop runaway jobs and re-run failed ones without recreating them. Cancel/retry buttons surface in the Jobs table for cancelable/retryable rows.
+  - `GET /jobs` accepts `limit`, `offset`, `status`, `provider_key`, `project_key`, `q` and returns `total/limit/offset` so the UI can paginate and filter.
+  - Live SSE stream (`/events/stream`) now consumes a Redis pub/sub channel (`voiceforge:jobs`) instead of polling. State transitions in `services_jobs` publish notifications, so updates land sub-second; a heartbeat fallback keeps the stream alive when Redis is unreachable.
+  - Optional API-key auth via `APP_API_KEYS` (CSV). The `X-API-Key` header (or `?api_key=` for SSE) gates everything except `/health`. When the variable is empty, the gate is a no-op for backward compatibility. Frontend reads `VITE_API_KEY` and injects it through `apiFetch` + the `EventSource` URL.
+  - HTML5 drag-and-drop reordering for ScriptEditor rows (in addition to the existing up/down buttons).
+  - Inline `<audio>` player on the Jobs detail panel so users can preview artifacts without leaving the page.
+  - i18n message catalogs split into `src/i18n/en.json` + `src/i18n/vi.json`; `i18n.tsx` only owns the provider/hook surface now.
+  - Design tokens (`--vf-color-*`, `--vf-radius-*`, `--vf-space-*`) declared at the top of `styles.css`; new components consume them.
+  - `<ErrorBoundary>` wraps the app at the root; `Skeleton` / `SkeletonBlock` components for loading states.
 
 ### Changed
 - `docker-compose.yml` now serializes `migrate → api/worker` and exposes `APP_ALLOWED_ORIGINS` to the API container.

@@ -1,4 +1,34 @@
+/*
+ * Design tokens. Add new shared values here rather than re-hardcoding hex
+ * colors / spacing throughout the file. New components should consume these
+ * (var(--vf-*)) so theme changes can happen in one place.
+ */
 :root {
+  /* color */
+  --vf-color-text: #f7f8ff;
+  --vf-color-text-muted: #b9c8ff;
+  --vf-color-accent: #745fff;
+  --vf-color-accent-strong: #875eff;
+  --vf-color-success: #8ff0ba;
+  --vf-color-danger: #ffb4c2;
+  --vf-color-bg-1: #060b17;
+  --vf-color-bg-2: #050913;
+  --vf-surface-1: rgba(15, 23, 42, 0.55);
+  --vf-surface-2: rgba(116, 95, 255, 0.12);
+
+  /* radius */
+  --vf-radius-sm: 6px;
+  --vf-radius-md: 12px;
+  --vf-radius-lg: 18px;
+
+  /* spacing scale (4px grid) */
+  --vf-space-1: 4px;
+  --vf-space-2: 8px;
+  --vf-space-3: 12px;
+  --vf-space-4: 16px;
+  --vf-space-5: 24px;
+  --vf-space-6: 32px;
+
   font-family:
     Inter,
     ui-sans-serif,
@@ -7,11 +37,11 @@
     BlinkMacSystemFont,
     "Segoe UI",
     sans-serif;
-  color: #f7f8ff;
+  color: var(--vf-color-text);
   background:
-    radial-gradient(circle at top right, rgba(116, 95, 255, 0.12), transparent 28%),
+    radial-gradient(circle at top right, var(--vf-surface-2), transparent 28%),
     radial-gradient(circle at bottom left, rgba(22, 163, 255, 0.08), transparent 26%),
-    linear-gradient(180deg, #060b17 0%, #050913 100%);
+    linear-gradient(180deg, var(--vf-color-bg-1) 0%, var(--vf-color-bg-2) 100%);
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
@@ -1466,6 +1496,70 @@ input[type="range"] {
 
 .script-row-disabled {
   opacity: 0.58;
+}
+
+.script-table tbody tr {
+  cursor: grab;
+}
+
+.script-row-dragging {
+  opacity: 0.4;
+  cursor: grabbing;
+}
+
+.inline-audio-player {
+  width: 100%;
+  margin: var(--vf-space-1) 0;
+}
+
+.skeleton {
+  display: inline-block;
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.04) 0%,
+    rgba(255, 255, 255, 0.12) 50%,
+    rgba(255, 255, 255, 0.04) 100%
+  );
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.4s ease-in-out infinite;
+}
+
+.skeleton-rounded {
+  border-radius: var(--vf-radius-sm);
+}
+
+.skeleton-block {
+  display: flex;
+  flex-direction: column;
+}
+
+@keyframes skeleton-shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+.error-boundary-fallback {
+  padding: var(--vf-space-5);
+  border-radius: var(--vf-radius-md);
+  background: var(--vf-surface-1);
+  border: 1px solid rgba(255, 180, 194, 0.4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--vf-space-3);
+}
+
+.error-boundary-fallback button {
+  align-self: flex-start;
+  padding: var(--vf-space-2) var(--vf-space-4);
+  border-radius: var(--vf-radius-sm);
+  border: 1px solid var(--vf-color-accent);
+  background: var(--vf-color-accent-strong);
+  color: var(--vf-color-text);
+  cursor: pointer;
 }
 
 .master-artifact-card {
