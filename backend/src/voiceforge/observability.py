@@ -68,8 +68,24 @@ _INFLIGHT_DELTA = {
 def record_job_event(reason: str, provider_key: str | None = None) -> None:
     jobs_state_transitions_total.labels(reason=reason, provider_key=provider_key or "unknown").inc()
     delta = _INFLIGHT_DELTA.get(reason)
-    if delta is not None:
-        jobs_in_flight.inc(delta)
+    if delta is None:
+        return
+    jobs_in_flight.inc(delta)
+    # Clamp to ≥ 0. If a terminal event arrives for a job whose creation we
+    # never observed (e.g. an old job reaped after a restart), the delta would
+    # otherwise drift the gauge negative — meaningless for "in-flight".
+    if jobs_in_flight._value.get() < 0:  # type: ignore[attr-defined]
+        jobs_in_flight.set(0)
+
+
+def seed_jobs_in_flight(count: int) -> None:
+    """Seed the in-flight gauge from the DB at startup.
+
+    Without this, a process restart resets the gauge to 0 while jobs still
+    sit in the queued/running state in postgres; the next terminal event
+    underflows. Called once from the FastAPI lifespan startup hook.
+    """
+    jobs_in_flight.set(max(0, count))
 
 
 def render_metrics() -> tuple[bytes, str]:

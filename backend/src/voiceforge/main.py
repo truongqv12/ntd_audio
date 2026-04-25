@@ -9,11 +9,14 @@ from uuid import uuid4
 from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 
+from sqlalchemy import func, select
+
 from .api_router import build_api_router
 from .config import settings
 from .db import SessionLocal, init_db
 from .logging_setup import setup_logging
-from .observability import record_http, render_metrics
+from .models import JobStatus, SynthesisJob
+from .observability import record_http, render_metrics, seed_jobs_in_flight
 from .services_catalog import refresh_catalog
 from .services_jobs import reap_stale_jobs
 from .services_projects import ensure_project
@@ -61,6 +64,19 @@ async def lifespan(_app: FastAPI):
     db = SessionLocal()
     try:
         ensure_project(db)
+        # Seed the in-flight gauge from the DB so a process restart doesn't
+        # leave it at 0 while queued/running jobs still exist — that would
+        # cause subsequent terminal events to drift the gauge negative.
+        if settings.metrics_enabled:
+            inflight = (
+                db.scalar(
+                    select(func.count(SynthesisJob.id)).where(
+                        SynthesisJob.status.in_((JobStatus.queued.value, JobStatus.running.value))
+                    )
+                )
+                or 0
+            )
+            seed_jobs_in_flight(int(inflight))
     finally:
         db.close()
 
