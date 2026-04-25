@@ -45,11 +45,23 @@ class LocalArtifactStorage:
     """Write artifacts under ``settings.artifact_root``. Returns a relative URL the API serves."""
 
     def __init__(self, root: Path) -> None:
-        self._root = root
+        self._root = root.resolve()
         self._root.mkdir(parents=True, exist_ok=True)
 
+    def _resolve(self, key: str) -> Path:
+        """Resolve ``key`` against the artifact root and refuse anything that escapes it.
+
+        Any caller-controlled key — even one that looks innocuous — must be
+        contained inside ``self._root``. Without this check, ``../`` segments
+        let the caller read or clobber arbitrary files on the host.
+        """
+        candidate = (self._root / key).resolve()
+        if candidate != self._root and self._root not in candidate.parents:
+            raise ValueError(f"artifact key escapes storage root: {key!r}")
+        return candidate
+
     def _path(self, key: str) -> Path:
-        path = self._root / key
+        path = self._resolve(key)
         path.parent.mkdir(parents=True, exist_ok=True)
         return path
 
@@ -65,13 +77,16 @@ class LocalArtifactStorage:
         return f"/artifacts/{key}"
 
     def read_bytes(self, key: str) -> bytes:
-        return self._path(key).read_bytes()
+        return self._resolve(key).read_bytes()
 
     def exists(self, key: str) -> bool:
-        return (self._root / key).exists()
+        try:
+            return self._resolve(key).exists()
+        except ValueError:
+            return False
 
     def delete(self, key: str) -> None:
-        target = self._root / key
+        target = self._resolve(key)
         if target.exists():
             target.unlink()
 

@@ -13,7 +13,9 @@ version: "3.9"
 services:
   postgres:
     restart: unless-stopped
-    ports: []
+    # Compose appends ports lists on merge — use !reset (Compose v2.24+) so the
+    # base "5432:5432" host binding is actually removed in production.
+    ports: !reset []
     deploy:
       resources:
         limits:
@@ -26,7 +28,8 @@ services:
 
   redis:
     restart: unless-stopped
-    ports: []
+    # See note on postgres above — ports list is appended, not replaced.
+    ports: !reset []
     command: ["redis-server", "--appendonly", "yes", "--save", "60", "1000"]
     volumes:
       - redis-data:/data
