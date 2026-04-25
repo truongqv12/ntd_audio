@@ -57,11 +57,14 @@ services:
       METRICS_ENABLED: "true"
       RATE_LIMIT_PER_MINUTE: ${RATE_LIMIT_PER_MINUTE:-120}
       MONITOR_CONTAINER_LOGS_ENABLED: "false"
-    # Production drops the docker socket — container log monitoring is disabled.
+    # Production drops the docker socket. Compose merges volumes by mount-point
+    # rather than replacing the list, so we explicitly mask /var/run/docker.sock
+    # with /dev/null instead of just omitting it from the overlay.
     volumes:
       - artifacts-data:/data/artifacts
       - cache-data:/data/cache
       - logs-data:/data/logs
+      - /dev/null:/var/run/docker.sock:ro
     deploy:
       resources:
         limits:

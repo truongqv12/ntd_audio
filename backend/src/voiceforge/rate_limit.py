@@ -23,6 +23,7 @@ from .config import settings
 _WINDOW_SECONDS = 60.0
 _buckets: dict[str, deque[float]] = defaultdict(deque)
 _lock = Lock()
+_last_sweep: float = 0.0
 
 
 def _client_key(request: Request) -> str:
@@ -34,8 +35,20 @@ def _client_key(request: Request) -> str:
     return "anon"
 
 
+def _sweep_stale_buckets(cutoff: float) -> None:
+    """Drop any bucket whose newest hit is older than the window.
+
+    Keeps ``_buckets`` bounded under high-cardinality traffic (botnets,
+    scanners). Caller must hold ``_lock``.
+    """
+    stale = [key for key, bucket in _buckets.items() if not bucket or bucket[-1] < cutoff]
+    for key in stale:
+        _buckets.pop(key, None)
+
+
 def check_rate_limit(request: Request) -> None:
     """FastAPI dependency: 429 when the caller exceeds the configured rate."""
+    global _last_sweep
     limit = settings.rate_limit_per_minute
     if limit <= 0:
         return
@@ -45,6 +58,9 @@ def check_rate_limit(request: Request) -> None:
     key = _client_key(request)
 
     with _lock:
+        if now - _last_sweep > _WINDOW_SECONDS:
+            _sweep_stale_buckets(cutoff)
+            _last_sweep = now
         bucket = _buckets[key]
         while bucket and bucket[0] < cutoff:
             bucket.popleft()
@@ -60,5 +76,7 @@ def check_rate_limit(request: Request) -> None:
 
 def reset_rate_limit_state() -> None:
     """Test helper: clear all buckets."""
+    global _last_sweep
     with _lock:
         _buckets.clear()
+        _last_sweep = 0.0

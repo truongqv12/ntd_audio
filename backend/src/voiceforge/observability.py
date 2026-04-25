@@ -53,8 +53,23 @@ def record_http(method: str, path_template: str, status: int, duration_seconds: 
     http_request_duration_seconds.labels(method=method, path_template=path_template).observe(duration_seconds)
 
 
+# reason → in-flight delta. job_created/job_retried add to the queue;
+# terminal transitions remove from it. job_started is a no-op because the job
+# was already counted at job_created.
+_INFLIGHT_DELTA = {
+    "job_created": 1,
+    "job_retried": 1,
+    "job_succeeded": -1,
+    "job_failed": -1,
+    "job_canceled": -1,
+}
+
+
 def record_job_event(reason: str, provider_key: str | None = None) -> None:
     jobs_state_transitions_total.labels(reason=reason, provider_key=provider_key or "unknown").inc()
+    delta = _INFLIGHT_DELTA.get(reason)
+    if delta is not None:
+        jobs_in_flight.inc(delta)
 
 
 def render_metrics() -> tuple[bytes, str]:
