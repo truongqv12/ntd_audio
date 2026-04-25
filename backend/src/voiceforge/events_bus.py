@@ -54,6 +54,14 @@ def _sync_client() -> redis.Redis | None:
 
 def publish_jobs_changed(reason: str, *, payload: dict | None = None) -> None:
     """Fire-and-forget notification. Never raises — Redis going down can't break a job commit."""
+    # Metrics are local; record before touching Redis so we still get them when Redis is down.
+    try:
+        from .observability import record_job_event
+
+        record_job_event(reason, (payload or {}).get("provider_key"))
+    except Exception as exc:
+        logger.debug("events_bus_metric_record_failed err=%s", exc)
+
     client = _sync_client()
     if client is None:
         return
@@ -88,9 +96,7 @@ async def subscribe_jobs_changed(heartbeat_seconds: float = 15.0) -> AsyncIterat
         while True:
             # redis-py's get_message blocks up to ``timeout`` seconds when no
             # message is pending; passing 0/None would hot-spin the loop.
-            message = await pubsub.get_message(
-                ignore_subscribe_messages=True, timeout=heartbeat_seconds
-            )
+            message = await pubsub.get_message(ignore_subscribe_messages=True, timeout=heartbeat_seconds)
             if message is None:
                 yield {"reason": "heartbeat"}
                 continue

@@ -6,13 +6,14 @@ import time
 from contextlib import asynccontextmanager
 from uuid import uuid4
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 
-from .api_router import api_router
+from .api_router import build_api_router
 from .config import settings
 from .db import SessionLocal, init_db
 from .logging_setup import setup_logging
+from .observability import record_http, render_metrics
 from .services_catalog import refresh_catalog
 from .services_jobs import reap_stale_jobs
 from .services_projects import ensure_project
@@ -107,7 +108,10 @@ app.add_middleware(
     expose_headers=["X-App-Version", "X-Request-Id"],
 )
 
-app.include_router(api_router)
+# Versioned mount is the canonical surface; the un-versioned mount stays for
+# backward-compat with existing clients and is marked deprecated via a header.
+app.include_router(build_api_router(), prefix="/v1")
+app.include_router(build_api_router())
 
 
 @app.middleware("http")
@@ -118,6 +122,10 @@ async def request_logging_middleware(request: Request, call_next):
     elapsed_ms = round((time.perf_counter() - started) * 1000, 2)
     response.headers["x-request-id"] = request_id
     response.headers["x-app-version"] = settings.app_version
+    if settings.metrics_enabled:
+        route = request.scope.get("route")
+        path_template = getattr(route, "path", request.url.path)
+        record_http(request.method, path_template, response.status_code, elapsed_ms / 1000.0)
     logger.info(
         "http_request request_id=%s method=%s path=%s status=%s duration_ms=%s",
         request_id,
@@ -132,3 +140,11 @@ async def request_logging_middleware(request: Request, call_next):
 @app.get("/")
 def root() -> dict:
     return {"app": settings.app_name, "status": "ready", "version": settings.app_version}
+
+
+@app.get("/metrics", include_in_schema=False)
+def metrics() -> Response:
+    if not settings.metrics_enabled:
+        return Response(status_code=404)
+    body, content_type = render_metrics()
+    return Response(content=body, media_type=content_type)
