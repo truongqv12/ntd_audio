@@ -1,4 +1,3 @@
-
 export type ProviderParamField = {
   key: string;
   label: string;
@@ -17,7 +16,10 @@ export type ProviderCredential = {
   provider_key: string;
   label: string;
   category: string;
-  fields: Record<string, { label: string; secret: boolean; value: string; env?: string; env_present?: boolean }>;
+  fields: Record<
+    string,
+    { label: string; secret: boolean; value: string; env?: string; env_present?: boolean }
+  >;
   effective_fields: Record<string, string>;
   configured: boolean;
   env_overrides: string[];
@@ -153,7 +155,6 @@ export type ProjectsResponse = {
   items: Project[];
 };
 
-
 export type ProjectScriptRow = {
   id: string;
   project_key: string;
@@ -238,7 +239,6 @@ export type MonitorStatus = {
   providers: ProviderDiagnostic[];
   guidance: string[];
 };
-
 
 export type LogSource = {
   key: string;

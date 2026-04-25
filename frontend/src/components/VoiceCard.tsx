@@ -28,16 +28,22 @@ export const VoiceCard = memo(function VoiceCard({
               <strong>{voice.display_name}</strong>
               <p>{voice.provider_label}</p>
             </div>
-            <span className={`tiny-badge tiny-badge-${voice.provider_category}`}>{voice.provider_category}</span>
+            <span className={`tiny-badge tiny-badge-${voice.provider_category}`}>
+              {voice.provider_category}
+            </span>
           </div>
           <div className="voice-card-meta">
             <span>{voice.language ?? t("common.unknown")}</span>
             <span>{voice.locale ?? "—"}</span>
           </div>
           <div className="chip-row">
-            {capabilityBadges(voice.capabilities).slice(0, 4).map((item) => (
-              <span className="chip" key={item}>{t(`common.${item}`)}</span>
-            ))}
+            {capabilityBadges(voice.capabilities)
+              .slice(0, 4)
+              .map((item) => (
+                <span className="chip" key={item}>
+                  {t(`common.${item}`)}
+                </span>
+              ))}
           </div>
         </div>
       </div>

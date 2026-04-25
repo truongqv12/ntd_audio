@@ -34,7 +34,9 @@ def create_project_route(payload: CreateProjectRequest, db: Session = Depends(ge
 
 
 @router.patch("/{project_key}", response_model=ProjectResponse)
-def update_project_route(project_key: str, payload: UpdateProjectRequest, db: Session = Depends(get_db)) -> ProjectResponse:
+def update_project_route(
+    project_key: str, payload: UpdateProjectRequest, db: Session = Depends(get_db)
+) -> ProjectResponse:
     project = update_project(db, project_key, payload)
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")

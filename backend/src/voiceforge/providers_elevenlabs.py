@@ -78,7 +78,9 @@ class ElevenLabsProvider:
             )
         return voices
 
-    def synthesize(self, *, text: str, voice_id: str, output_format: str = "mp3", params: dict | None = None) -> SynthesisResult:
+    def synthesize(
+        self, *, text: str, voice_id: str, output_format: str = "mp3", params: dict | None = None
+    ) -> SynthesisResult:
         cfg = self._cfg()
         if not cfg.get("elevenlabs_api_key"):
             raise RuntimeError("ELEVENLABS_API_KEY missing")

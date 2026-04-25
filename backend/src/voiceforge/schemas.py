@@ -107,8 +107,6 @@ class ProjectsResponse(BaseModel):
     items: list[ProjectResponse]
 
 
-
-
 class ProjectScriptRowBase(BaseModel):
     row_index: int
     title: str | None = None
@@ -260,7 +258,6 @@ class MonitorStatusResponse(BaseModel):
     queue: QueueMetricsResponse
     providers: list[ProviderDiagnosticResponse]
     guidance: list[str] = []
-
 
 
 class ProviderParamFieldResponse(BaseModel):

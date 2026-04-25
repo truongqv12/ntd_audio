@@ -1,0 +1,91 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "voiceforge"
+version = "1.0.0"
+description = "VoiceForge Studio backend"
+readme = "../README.md"
+requires-python = ">=3.12"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+src = ["src", "tests"]
+extend-exclude = ["alembic/versions"]
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "F",   # pyflakes
+    "W",   # pycodestyle warnings
+    "I",   # isort
+    "B",   # flake8-bugbear
+    "UP",  # pyupgrade
+    "C4",  # flake8-comprehensions
+    "SIM", # flake8-simplify
+    "PL",  # pylint subset
+    "RUF", # ruff
+]
+ignore = [
+    "E501",     # handled by black
+    "PLR0913",  # too many args (services_jobs)
+    "PLR0912",  # too many branches
+    "PLR0915",  # too many statements
+    "PLR2004",  # magic value
+    "PLR0911",  # too many returns
+    "B008",     # function call in default arg (FastAPI Depends)
+    "SIM105",   # contextlib.suppress vs try/except/pass — stylistic
+    "SIM108",   # ternary
+    "UP022",    # subprocess capture_output — stylistic
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["PLR2004", "S101", "B011"]
+"alembic/env.py" = ["E402"]
+
+[tool.black]
+line-length = 120
+target-version = ["py312"]
+extend-exclude = "/(alembic/versions)/"
+
+[tool.mypy]
+python_version = "3.12"
+strict_optional = true
+warn_unused_ignores = true
+warn_redundant_casts = true
+check_untyped_defs = true
+disallow_untyped_defs = false
+ignore_missing_imports = true
+exclude = ["alembic/versions/.*"]
+
+[[tool.mypy.overrides]]
+module = ["dramatiq.*", "docker.*"]
+ignore_errors = true
+
+# Pre-existing modules with type debt — opt-out until they're cleaned up incrementally.
+# New code in voiceforge.security, voiceforge.main, voiceforge.db, voiceforge.config,
+# voiceforge.routes_health and voiceforge.services_jobs is type-checked.
+[[tool.mypy.overrides]]
+module = [
+    "voiceforge.providers_params",
+    "voiceforge.providers_elevenlabs",
+    "voiceforge.providers_azure_speech",
+    "voiceforge.routes_settings",
+    "voiceforge.services_app_settings",
+    "voiceforge.services_project_rows",
+]
+ignore_errors = true
+
+[tool.pytest.ini_options]
+minversion = "8.0"
+addopts = "-q --strict-markers --disable-warnings"
+testpaths = ["tests"]
+pythonpath = ["src"]
+markers = [
+    "integration: tests requiring postgres/redis/voicevox",
+]

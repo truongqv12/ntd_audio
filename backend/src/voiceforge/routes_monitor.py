@@ -19,5 +19,7 @@ def get_monitor_log_sources() -> list[LogSourceResponse]:
 
 
 @router.get("/logs", response_model=LogTailResponse)
-def get_monitor_logs(source: str = Query(default="api"), limit: int = Query(default=200, ge=20, le=1000)) -> LogTailResponse:
+def get_monitor_logs(
+    source: str = Query(default="api"), limit: int = Query(default=200, ge=20, le=1000)
+) -> LogTailResponse:
     return read_log_tail(source_key=source, limit=limit)

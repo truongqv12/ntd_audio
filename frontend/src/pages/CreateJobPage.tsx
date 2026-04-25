@@ -58,7 +58,9 @@ export const CreateJobPage = memo(function CreateJobPage({
               <label>{t("common.project")}</label>
               <select value={selectedProjectKey} onChange={(event) => onSelectProject(event.target.value)}>
                 {projects.map((project) => (
-                  <option key={project.project_key} value={project.project_key}>{project.name}</option>
+                  <option key={project.project_key} value={project.project_key}>
+                    {project.name}
+                  </option>
                 ))}
               </select>
             </div>
@@ -83,15 +85,23 @@ export const CreateJobPage = memo(function CreateJobPage({
             <div className="detail-pills">
               <span>{selectedProject?.default_provider_key ?? t("projectsPage.noDefaultProvider")}</span>
               <span>{selectedProject?.default_output_format ?? outputFormat}</span>
-              <span>{selectedProject?.stats.total_jobs ?? 0} {t("createJob.jobsCount")}</span>
+              <span>
+                {selectedProject?.stats.total_jobs ?? 0} {t("createJob.jobsCount")}
+              </span>
             </div>
           </div>
 
           <div className="form-field">
             <label>{t("createJob.scriptLabel")}</label>
-            <textarea rows={10} value={sourceText} onChange={(event) => onSourceTextChange(event.target.value)} />
+            <textarea
+              rows={10}
+              value={sourceText}
+              onChange={(event) => onSourceTextChange(event.target.value)}
+            />
             <div className="helper-row">
-              <span>{sourceText.length} {t("createJob.chars")}</span>
+              <span>
+                {sourceText.length} {t("createJob.chars")}
+              </span>
               <span>{t("createJob.scriptHint")}</span>
             </div>
           </div>
@@ -108,12 +118,20 @@ export const CreateJobPage = memo(function CreateJobPage({
           />
 
           {errorMessage ? <div className="inline-alert">{errorMessage}</div> : null}
-          <button type="button" className="primary-button" disabled={!selectedVoice || !sourceText.trim() || isSubmitting} onClick={onCreateJob}>
+          <button
+            type="button"
+            className="primary-button"
+            disabled={!selectedVoice || !sourceText.trim() || isSubmitting}
+            onClick={onCreateJob}
+          >
             {isSubmitting ? t("createJob.queueing") : t("createJob.queueButton")}
           </button>
         </Panel>
 
-        <Panel title={t("createJob.selectedVoiceTitle")} description={t("createJob.selectedVoiceDescription")}>
+        <Panel
+          title={t("createJob.selectedVoiceTitle")}
+          description={t("createJob.selectedVoiceDescription")}
+        >
           <div className="voice-selection-actions">
             <button type="button" className="ghost-button" onClick={() => setIsPickerOpen(true)}>
               {selectedVoice ? t("common.changeVoice") : t("createJob.pickerButton")}
@@ -127,10 +145,15 @@ export const CreateJobPage = memo(function CreateJobPage({
                   <VoiceAvatar voice={selectedVoice} size="lg" />
                   <div>
                     <h3>{selectedVoice.display_name}</h3>
-                    <p>{selectedVoice.provider_label} · {selectedVoice.language ?? t("common.unknown")} · {selectedVoice.locale ?? "—"}</p>
+                    <p>
+                      {selectedVoice.provider_label} · {selectedVoice.language ?? t("common.unknown")} ·{" "}
+                      {selectedVoice.locale ?? "—"}
+                    </p>
                   </div>
                 </div>
-                <span className={`tiny-badge tiny-badge-${selectedVoice.provider_category}`}>{selectedVoice.provider_category}</span>
+                <span className={`tiny-badge tiny-badge-${selectedVoice.provider_category}`}>
+                  {selectedVoice.provider_category}
+                </span>
               </div>
               <p className="muted-copy">{selectedVoice.description ?? t("common.noDescription")}</p>
               <div className="detail-pills">
@@ -140,10 +163,14 @@ export const CreateJobPage = memo(function CreateJobPage({
               </div>
               <div className="chip-row">
                 {capabilityBadges(selectedVoice.capabilities).map((item) => (
-                  <span className="chip" key={item}>{t(`common.${item}`)}</span>
+                  <span className="chip" key={item}>
+                    {t(`common.${item}`)}
+                  </span>
                 ))}
                 {selectedVoice.styles.map((style) => (
-                  <span className="chip" key={style}>{style}</span>
+                  <span className="chip" key={style}>
+                    {style}
+                  </span>
                 ))}
               </div>
               {selectedVoice.preview_url ? (

@@ -6,7 +6,7 @@ from sqlalchemy import case, func, select
 from sqlalchemy.orm import Session
 
 from .models import Project, SynthesisJob
-from .schemas import CreateProjectRequest, ProjectResponse, ProjectStatsResponse, ProjectsResponse, UpdateProjectRequest
+from .schemas import CreateProjectRequest, ProjectResponse, ProjectsResponse, ProjectStatsResponse, UpdateProjectRequest
 
 
 def _project_stats_map(db: Session) -> dict[str, ProjectStatsResponse]:
@@ -19,8 +19,7 @@ def _project_stats_map(db: Session) -> dict[str, ProjectStatsResponse]:
             func.sum(case((SynthesisJob.status == "succeeded", 1), else_=0)).label("succeeded_jobs"),
             func.sum(case((SynthesisJob.status == "failed", 1), else_=0)).label("failed_jobs"),
             func.max(SynthesisJob.created_at).label("last_job_created_at"),
-        )
-        .group_by(SynthesisJob.project_id)
+        ).group_by(SynthesisJob.project_id)
     ).all()
     result: dict[str, ProjectStatsResponse] = {}
     for row in rows:
@@ -35,7 +34,9 @@ def _project_stats_map(db: Session) -> dict[str, ProjectStatsResponse]:
     return result
 
 
-def serialize_project(db: Session, project: Project, stats_map: dict[str, ProjectStatsResponse] | None = None) -> ProjectResponse:
+def serialize_project(
+    db: Session, project: Project, stats_map: dict[str, ProjectStatsResponse] | None = None
+) -> ProjectResponse:
     stats_map = stats_map or _project_stats_map(db)
     return ProjectResponse(
         id=project.id,

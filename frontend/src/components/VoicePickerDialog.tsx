@@ -23,7 +23,9 @@ export const VoicePickerDialog = memo(function VoicePickerDialog({
   onSelectVoice,
 }: VoicePickerDialogProps) {
   const { locale, t } = useI18n();
-  const [providerKey, setProviderKey] = useState<string>(selectedVoice?.provider_key ?? providers[0]?.key ?? "");
+  const [providerKey, setProviderKey] = useState<string>(
+    selectedVoice?.provider_key ?? providers[0]?.key ?? "",
+  );
   const [localeFilter, setLocaleFilter] = useState<string>(selectedVoice?.locale ?? "all");
   const [search, setSearch] = useState("");
   const [remoteVoices, setRemoteVoices] = useState<VoiceCatalogEntry[]>([]);
@@ -65,7 +67,8 @@ export const VoicePickerDialog = memo(function VoicePickerDialog({
         if (!ignore) {
           const fallback = voices.filter((voice) => {
             const matchesProvider = voice.provider_key === providerKey;
-            const matchesLocale = localeFilter === "all" || (voice.locale ?? voice.language ?? "unknown") === localeFilter;
+            const matchesLocale =
+              localeFilter === "all" || (voice.locale ?? voice.language ?? "unknown") === localeFilter;
             const query = deferredSearch.trim().toLowerCase();
             const haystack = [
               voice.display_name,
@@ -135,9 +138,13 @@ export const VoicePickerDialog = memo(function VoicePickerDialog({
                     <p>{provider.key}</p>
                   </div>
                   <div className="chip-row">
-                    {capabilityBadges(provider.capabilities).slice(0, 3).map((item) => (
-                      <span className="chip" key={item}>{t(`common.${item}`)}</span>
-                    ))}
+                    {capabilityBadges(provider.capabilities)
+                      .slice(0, 3)
+                      .map((item) => (
+                        <span className="chip" key={item}>
+                          {t(`common.${item}`)}
+                        </span>
+                      ))}
                   </div>
                 </button>
               ))}
@@ -150,7 +157,11 @@ export const VoicePickerDialog = memo(function VoicePickerDialog({
                 <h3>{t("voicePicker.localeList")}</h3>
                 <p className="muted-copy">{t("common.countryFilterHint")}</p>
               </div>
-              <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder={t("common.search")} />
+              <input
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder={t("common.search")}
+              />
             </div>
             <div className="locale-chip-row">
               <button
@@ -174,37 +185,51 @@ export const VoicePickerDialog = memo(function VoicePickerDialog({
 
             <div className="voice-dialog-list">
               {isSearching ? <p className="muted-copy">Searching voices…</p> : null}
-              {!isSearching && filteredVoices.length > 0 ? (
-                filteredVoices.map((voice) => {
-                  const active = selectedVoice?.provider_key === voice.provider_key && selectedVoice?.provider_voice_id === voice.provider_voice_id;
-                  return (
-                    <button
-                      key={`${voice.provider_key}:${voice.provider_voice_id}`}
-                      type="button"
-                      className={`voice-dialog-card ${active ? "voice-dialog-card-active" : ""}`}
-                      onClick={() => onSelectVoice(voice)}
-                    >
-                      <VoiceAvatar voice={voice} size="md" />
-                      <div className="voice-dialog-card-body">
-                        <div className="voice-dialog-card-head">
-                          <div>
-                            <strong>{voice.display_name}</strong>
-                            <p>{voice.language ?? t("common.unknown")} · {voice.locale ?? "—"}</p>
+              {!isSearching && filteredVoices.length > 0
+                ? filteredVoices.map((voice) => {
+                    const active =
+                      selectedVoice?.provider_key === voice.provider_key &&
+                      selectedVoice?.provider_voice_id === voice.provider_voice_id;
+                    return (
+                      <button
+                        key={`${voice.provider_key}:${voice.provider_voice_id}`}
+                        type="button"
+                        className={`voice-dialog-card ${active ? "voice-dialog-card-active" : ""}`}
+                        onClick={() => onSelectVoice(voice)}
+                      >
+                        <VoiceAvatar voice={voice} size="md" />
+                        <div className="voice-dialog-card-body">
+                          <div className="voice-dialog-card-head">
+                            <div>
+                              <strong>{voice.display_name}</strong>
+                              <p>
+                                {voice.language ?? t("common.unknown")} · {voice.locale ?? "—"}
+                              </p>
+                            </div>
+                            <span className={`tiny-badge tiny-badge-${voice.provider_category}`}>
+                              {voice.provider_category}
+                            </span>
                           </div>
-                          <span className={`tiny-badge tiny-badge-${voice.provider_category}`}>{voice.provider_category}</span>
+                          <p className="muted-copy line-clamp-2">
+                            {voice.description ?? t("common.noDescription")}
+                          </p>
+                          <div className="chip-row">
+                            {capabilityBadges(voice.capabilities)
+                              .slice(0, 4)
+                              .map((item) => (
+                                <span className="chip" key={item}>
+                                  {t(`common.${item}`)}
+                                </span>
+                              ))}
+                          </div>
                         </div>
-                        <p className="muted-copy line-clamp-2">{voice.description ?? t("common.noDescription")}</p>
-                        <div className="chip-row">
-                          {capabilityBadges(voice.capabilities).slice(0, 4).map((item) => (
-                            <span className="chip" key={item}>{t(`common.${item}`)}</span>
-                          ))}
-                        </div>
-                      </div>
-                    </button>
-                  );
-                })
+                      </button>
+                    );
+                  })
+                : null}
+              {!isSearching && filteredVoices.length === 0 ? (
+                <p className="muted-copy">{t("voicePicker.noVoices")}</p>
               ) : null}
-              {!isSearching && filteredVoices.length === 0 ? <p className="muted-copy">{t("voicePicker.noVoices")}</p> : null}
             </div>
           </section>
 
@@ -217,7 +242,9 @@ export const VoicePickerDialog = memo(function VoicePickerDialog({
                   <div>
                     <strong>{previewVoice.display_name}</strong>
                     <p>{previewVoice.provider_label}</p>
-                    <p className="muted-copy">{formatLocaleLabel(previewVoice.locale ?? previewVoice.language, locale)}</p>
+                    <p className="muted-copy">
+                      {formatLocaleLabel(previewVoice.locale ?? previewVoice.language, locale)}
+                    </p>
                   </div>
                 </div>
                 <div className="detail-pills">
@@ -226,10 +253,14 @@ export const VoicePickerDialog = memo(function VoicePickerDialog({
                 </div>
                 <div className="chip-row">
                   {previewVoice.styles.map((style) => (
-                    <span className="chip" key={style}>{style}</span>
+                    <span className="chip" key={style}>
+                      {style}
+                    </span>
                   ))}
                   {previewVoice.tags.map((tag) => (
-                    <span className="chip" key={tag}>{tag}</span>
+                    <span className="chip" key={tag}>
+                      {tag}
+                    </span>
                   ))}
                 </div>
                 {previewVoice.preview_url ? (
