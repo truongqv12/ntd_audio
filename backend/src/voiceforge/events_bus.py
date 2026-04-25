@@ -74,17 +74,23 @@ async def subscribe_jobs_changed(heartbeat_seconds: float = 15.0) -> AsyncIterat
     trigger keepalive / reconnect logic. If Redis is unreachable, only
     heartbeats are yielded.
     """
+    client: redis_async.Redis | None = None
+    pubsub = None
     try:
-        client = redis_async.from_url(settings.redis_url, decode_responses=True)
-        pubsub = client.pubsub()
-        await pubsub.subscribe(CHANNEL)
-    except Exception as exc:
-        logger.warning("events_bus_subscribe_unavailable url=%s err=%s", settings.redis_url, exc)
-        while True:
-            await asyncio.sleep(heartbeat_seconds)
-            yield {"reason": "heartbeat"}
+        try:
+            client = redis_async.from_url(settings.redis_url, decode_responses=True)
+            pubsub = client.pubsub()
+            await pubsub.subscribe(CHANNEL)
+        except Exception as exc:
+            logger.warning(
+                "events_bus_subscribe_unavailable url=%s err=%s", settings.redis_url, exc
+            )
+            # Subscribe failed — fall back to heartbeat-only. The outer finally
+            # still runs and closes whatever managed to get created.
+            while True:
+                await asyncio.sleep(heartbeat_seconds)
+                yield {"reason": "heartbeat"}
 
-    try:
         while True:
             # redis-py's get_message blocks up to ``timeout`` seconds when no
             # message is pending; passing 0/None would hot-spin the loop.
@@ -102,11 +108,13 @@ async def subscribe_jobs_changed(heartbeat_seconds: float = 15.0) -> AsyncIterat
             except json.JSONDecodeError:
                 logger.warning("events_bus_invalid_payload data=%r", data)
     finally:
-        try:
-            await pubsub.close()
-        except Exception:
-            pass
-        try:
-            await client.close()
-        except Exception:
-            pass
+        if pubsub is not None:
+            try:
+                await pubsub.close()
+            except Exception:
+                pass
+        if client is not None:
+            try:
+                await client.close()
+            except Exception:
+                pass
