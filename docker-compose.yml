@@ -11,16 +11,40 @@ services:
       - "5432:5432"
     volumes:
       - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d voiceforge"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
 
   redis:
     image: redis:7-alpine
     ports:
       - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
 
   voicevox:
     image: voicevox/voicevox_engine:cpu-latest
     ports:
       - "50021:50021"
+
+  migrate:
+    build:
+      context: ./backend
+    command: ["alembic", "upgrade", "head"]
+    working_dir: /app
+    env_file: .env
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg://postgres:postgres@postgres:5432/voiceforge}
+      PYTHONPATH: /app
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
 
   api:
     build:
@@ -36,17 +60,29 @@ services:
       PIPER_BASE_URL: ${PIPER_BASE_URL:-}
       KOKORO_BASE_URL: ${KOKORO_BASE_URL:-}
       VIENEU_TTS_BASE_URL: ${VIENEU_TTS_BASE_URL:-}
+      APP_ALLOWED_ORIGINS: ${APP_ALLOWED_ORIGINS:-http://localhost:5173}
     volumes:
       - artifacts-data:/data/artifacts
       - cache-data:/data/cache
       - logs-data:/data/logs
       - /var/run/docker.sock:/var/run/docker.sock:ro
     depends_on:
-      - postgres
-      - redis
-      - voicevox
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      voicevox:
+        condition: service_started
+      migrate:
+        condition: service_completed_successfully
     ports:
       - "8000:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=3)"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
 
   worker:
     build:
@@ -70,9 +106,14 @@ services:
       - cache-data:/data/cache
       - logs-data:/data/logs
     depends_on:
-      - postgres
-      - redis
-      - voicevox
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      voicevox:
+        condition: service_started
+      migrate:
+        condition: service_completed_successfully
 
   frontend:
     build:

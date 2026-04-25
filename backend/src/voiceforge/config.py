@@ -1,14 +1,29 @@
 from pathlib import Path
 
-from pydantic import Field
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+def _read_version_file() -> str:
+    candidate = Path(__file__).resolve().parents[2] / "VERSION"
+    if candidate.exists():
+        text = candidate.read_text(encoding="utf-8").strip()
+        if text:
+            return text
+    return "0.0.0"
 
 
 class Settings(BaseSettings):
     app_name: str = "VoiceForge Studio"
+    app_version: str = Field(default_factory=_read_version_file)
     app_env: str = Field(default="development", alias="APP_ENV")
     api_host: str = Field(default="0.0.0.0", alias="API_HOST")
     api_port: int = Field(default=8000, alias="API_PORT")
+
+    app_allowed_origins: list[str] = Field(
+        default_factory=lambda: ["http://localhost:5173"],
+        alias="APP_ALLOWED_ORIGINS",
+    )
 
     database_url: str = Field(
         default="postgresql+psycopg://postgres:postgres@postgres:5432/voiceforge",
@@ -34,6 +49,11 @@ class Settings(BaseSettings):
     preview_sample_text_en: str = Field(default="Hello, this is a short preview of the selected voice.", alias="PREVIEW_SAMPLE_TEXT_EN")
 
     voice_catalog_refresh_on_start: bool = Field(default=True, alias="VOICE_CATALOG_REFRESH_ON_START")
+    voice_catalog_refresh_timeout_seconds: float = Field(default=8.0, alias="VOICE_CATALOG_REFRESH_TIMEOUT_SECONDS")
+
+    job_max_runtime_seconds: int = Field(default=900, alias="JOB_MAX_RUNTIME_SECONDS")
+    job_reaper_interval_seconds: int = Field(default=60, alias="JOB_REAPER_INTERVAL_SECONDS")
+    job_reaper_enabled: bool = Field(default=True, alias="JOB_REAPER_ENABLED")
 
     voicevox_base_url: str = Field(default="http://voicevox:50021", alias="VOICEVOX_BASE_URL")
     voicevox_timeout_seconds: float = Field(default=30.0, alias="VOICEVOX_TIMEOUT_SECONDS")
@@ -66,6 +86,13 @@ class Settings(BaseSettings):
         case_sensitive=False,
         extra="ignore",
     )
+
+    @field_validator("app_allowed_origins", mode="before")
+    @classmethod
+    def _parse_allowed_origins(cls, value: object) -> object:
+        if isinstance(value, str):
+            return [item.strip() for item in value.split(",") if item.strip()]
+        return value
 
 
 settings = Settings()
