@@ -123,8 +123,11 @@ async def request_logging_middleware(request: Request, call_next):
     response.headers["x-request-id"] = request_id
     response.headers["x-app-version"] = settings.app_version
     if settings.metrics_enabled:
+        # Use the matched route's path template so metrics labels are bounded.
+        # Unmatched URLs (404s, scanners) collapse to a single timeseries to
+        # prevent a cardinality-explosion DoS.
         route = request.scope.get("route")
-        path_template = getattr(route, "path", request.url.path)
+        path_template = getattr(route, "path", None) or "__unmatched__"
         record_http(request.method, path_template, response.status_code, elapsed_ms / 1000.0)
     logger.info(
         "http_request request_id=%s method=%s path=%s status=%s duration_ms=%s",

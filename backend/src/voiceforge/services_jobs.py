@@ -87,7 +87,7 @@ def create_job(db: Session, payload: CreateJobRequest) -> JobResponse:
         job.provider_key,
         job.provider_voice_id,
     )
-    publish_jobs_changed("job_created", payload={"job_id": job.id})
+    publish_jobs_changed("job_created", payload={"job_id": job.id, "provider_key": job.provider_key})
     return serialize_job(db, job)
 
 
@@ -161,7 +161,7 @@ def cancel_job(db: Session, job_id: str) -> JobResponse | None:
     db.commit()
     db.refresh(job)
     logger.info("job_canceled job_id=%s", job.id)
-    publish_jobs_changed("job_canceled", payload={"job_id": job.id})
+    publish_jobs_changed("job_canceled", payload={"job_id": job.id, "provider_key": job.provider_key})
     return serialize_job(db, job)
 
 
@@ -208,7 +208,14 @@ def retry_job(db: Session, job_id: str) -> JobResponse | None:
     db.commit()
     db.refresh(new_job)
     logger.info("job_retried original_job_id=%s new_job_id=%s", original.id, new_job.id)
-    publish_jobs_changed("job_retried", payload={"original_job_id": original.id, "new_job_id": new_job.id})
+    publish_jobs_changed(
+        "job_retried",
+        payload={
+            "original_job_id": original.id,
+            "new_job_id": new_job.id,
+            "provider_key": new_job.provider_key,
+        },
+    )
     return serialize_job(db, new_job)
 
 
@@ -345,7 +352,7 @@ def process_job(db: Session, job_id: str) -> None:
     job.started_at = datetime.utcnow()
     db.add(JobEvent(job_id=job.id, event_type="started", message="Synthesis started", payload={}))
     db.commit()
-    publish_jobs_changed("job_started", payload={"job_id": job.id})
+    publish_jobs_changed("job_started", payload={"job_id": job.id, "provider_key": job.provider_key})
     logger.info("job_started job_id=%s provider=%s voice=%s", job.id, job.provider_key, job.provider_voice_id)
 
     existing_cache = db.scalar(select(GenerationCache).where(GenerationCache.cache_key == job.cache_key))
@@ -373,7 +380,10 @@ def process_job(db: Session, job_id: str) -> None:
         db.add(artifact)
         db.add(JobEvent(job_id=job.id, event_type="cache_hit", message="Reused cached artifact", payload={}))
         db.commit()
-        publish_jobs_changed("job_succeeded", payload={"job_id": job.id, "cache_hit": True})
+        publish_jobs_changed(
+            "job_succeeded",
+            payload={"job_id": job.id, "cache_hit": True, "provider_key": job.provider_key},
+        )
         logger.info("job_cache_hit job_id=%s", job.id)
         return
 
@@ -429,7 +439,7 @@ def process_job(db: Session, job_id: str) -> None:
             )
         )
         db.commit()
-        publish_jobs_changed("job_succeeded", payload={"job_id": job.id})
+        publish_jobs_changed("job_succeeded", payload={"job_id": job.id, "provider_key": job.provider_key})
         logger.info(
             "job_completed job_id=%s provider=%s artifact=%s size=%s",
             job.id,
@@ -450,7 +460,7 @@ def process_job(db: Session, job_id: str) -> None:
                 row.updated_at = datetime.utcnow()
         db.add(JobEvent(job_id=job.id, event_type="failed", message=str(exc), payload={}))
         db.commit()
-        publish_jobs_changed("job_failed", payload={"job_id": job.id})
+        publish_jobs_changed("job_failed", payload={"job_id": job.id, "provider_key": job.provider_key})
         logger.exception("job_failed job_id=%s provider=%s", job.id, job.provider_key)
         raise
 

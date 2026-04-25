@@ -83,16 +83,15 @@ async def subscribe_jobs_changed(heartbeat_seconds: float = 15.0) -> AsyncIterat
     heartbeats are yielded.
     """
     client: redis_async.Redis | None = None
-    pubsub = None
+    pubsub: redis_async.client.PubSub | None = None
     try:
         try:
             client = redis_async.from_url(settings.redis_url, decode_responses=True)
+            assert client is not None  # narrow for mypy across the try/except split
             pubsub = client.pubsub()
             await pubsub.subscribe(CHANNEL)
         except Exception as exc:
-            logger.warning(
-                "events_bus_subscribe_unavailable url=%s err=%s", settings.redis_url, exc
-            )
+            logger.warning("events_bus_subscribe_unavailable url=%s err=%s", settings.redis_url, exc)
             # Subscribe failed — fall back to heartbeat-only. The outer finally
             # still runs and closes whatever managed to get created.
             while True:
