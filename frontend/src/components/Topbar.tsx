@@ -35,14 +35,30 @@ export const Topbar = memo(function Topbar({
           <span>{t("topbar.totalVoices")}</span>
           <strong>{totalVoices}</strong>
         </div>
-        <button type="button" className="top-status-pill clickable-pill" onClick={() => onNavigate("notifications")}>
+        <button
+          type="button"
+          className="top-status-pill clickable-pill"
+          onClick={() => onNavigate("notifications")}
+        >
           <span className="status-dot status-good" />
           <span>{t("topbar.notifications")}</span>
           <strong>{unreadNotifications}</strong>
         </button>
-        <div className="language-switcher" aria-label={t("topbar.language")}> 
-          <button type="button" className={`lang-button ${locale === "vi" ? "lang-button-active" : ""}`} onClick={() => setLocale("vi")}>VI</button>
-          <button type="button" className={`lang-button ${locale === "en" ? "lang-button-active" : ""}`} onClick={() => setLocale("en")}>EN</button>
+        <div className="language-switcher" aria-label={t("topbar.language")}>
+          <button
+            type="button"
+            className={`lang-button ${locale === "vi" ? "lang-button-active" : ""}`}
+            onClick={() => setLocale("vi")}
+          >
+            VI
+          </button>
+          <button
+            type="button"
+            className={`lang-button ${locale === "en" ? "lang-button-active" : ""}`}
+            onClick={() => setLocale("en")}
+          >
+            EN
+          </button>
         </div>
       </div>
     </header>

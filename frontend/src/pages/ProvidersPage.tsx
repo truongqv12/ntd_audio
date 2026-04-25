@@ -21,7 +21,11 @@ export const ProvidersPage = memo(function ProvidersPage({ providers }: { provid
             </div>
             <p className="muted-copy compact-copy">{provider.reason}</p>
             <div className="chip-row">
-              {capabilityBadges(provider.capabilities).map((item) => <span className="chip" key={item}>{t(`common.${item}`)}</span>)}
+              {capabilityBadges(provider.capabilities).map((item) => (
+                <span className="chip" key={item}>
+                  {t(`common.${item}`)}
+                </span>
+              ))}
             </div>
           </div>
         ))}

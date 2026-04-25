@@ -35,6 +35,7 @@ class Settings(BaseSettings):
     artifact_root: Path = Field(default=Path("/data/artifacts"), alias="ARTIFACT_ROOT")
     cache_root: Path = Field(default=Path("/data/cache"), alias="CACHE_ROOT")
 
+    app_encryption_key: str = Field(default="", alias="APP_ENCRYPTION_KEY")
 
     log_level: str = Field(default="INFO", alias="LOG_LEVEL")
     log_file_path: Path = Field(default=Path("/data/logs/voiceforge.log"), alias="LOG_FILE_PATH")
@@ -45,8 +46,12 @@ class Settings(BaseSettings):
 
     monitor_docker_socket_path: str = Field(default="/var/run/docker.sock", alias="MONITOR_DOCKER_SOCKET_PATH")
     monitor_container_logs_enabled: bool = Field(default=True, alias="MONITOR_CONTAINER_LOGS_ENABLED")
-    preview_sample_text_vi: str = Field(default="Xin chào, đây là bản nghe thử giọng nói.", alias="PREVIEW_SAMPLE_TEXT_VI")
-    preview_sample_text_en: str = Field(default="Hello, this is a short preview of the selected voice.", alias="PREVIEW_SAMPLE_TEXT_EN")
+    preview_sample_text_vi: str = Field(
+        default="Xin chào, đây là bản nghe thử giọng nói.", alias="PREVIEW_SAMPLE_TEXT_VI"
+    )
+    preview_sample_text_en: str = Field(
+        default="Hello, this is a short preview of the selected voice.", alias="PREVIEW_SAMPLE_TEXT_EN"
+    )
 
     voice_catalog_refresh_on_start: bool = Field(default=True, alias="VOICE_CATALOG_REFRESH_ON_START")
     voice_catalog_refresh_timeout_seconds: float = Field(default=8.0, alias="VOICE_CATALOG_REFRESH_TIMEOUT_SECONDS")
@@ -57,7 +62,6 @@ class Settings(BaseSettings):
 
     voicevox_base_url: str = Field(default="http://voicevox:50021", alias="VOICEVOX_BASE_URL")
     voicevox_timeout_seconds: float = Field(default=30.0, alias="VOICEVOX_TIMEOUT_SECONDS")
-
 
     piper_base_url: str = Field(default="", alias="PIPER_BASE_URL")
     piper_timeout_seconds: float = Field(default=60.0, alias="PIPER_TIMEOUT_SECONDS")

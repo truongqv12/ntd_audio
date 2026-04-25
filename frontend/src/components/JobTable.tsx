@@ -38,18 +38,29 @@ export const JobTable = memo(function JobTable({
               </td>
               <td>{job.project_name ?? job.project_key}</td>
               <td>{job.provider_key}</td>
-              <td><StatusBadge value={job.status} /></td>
+              <td>
+                <StatusBadge value={job.status} />
+              </td>
               <td>{formatDateTime(job.created_at)}</td>
               <td>{formatJobDuration(job.duration_seconds)}</td>
               <td>
                 <div className="actions-row" onClick={(event) => event.stopPropagation()}>
                   {job.artifact ? (
-                    <a className="icon-button" href={artifactUrl(job.artifact.download_url)} target="_blank" rel="noreferrer">▶</a>
+                    <a
+                      className="icon-button"
+                      href={artifactUrl(job.artifact.download_url)}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      ▶
+                    </a>
                   ) : (
                     <span className="icon-button icon-button-disabled">▶</span>
                   )}
                   {job.artifact ? (
-                    <a className="icon-button" href={artifactUrl(job.artifact.download_url)} download>↓</a>
+                    <a className="icon-button" href={artifactUrl(job.artifact.download_url)} download>
+                      ↓
+                    </a>
                   ) : (
                     <span className="icon-button icon-button-disabled">↓</span>
                   )}

@@ -14,7 +14,6 @@ from sqlalchemy.orm import Session
 from .config import settings
 from .models import SynthesisJob, VoiceCatalogEntry
 from .provider_registry import list_providers
-from .services_app_settings import apply_provider_settings
 from .schemas import (
     LogSourceResponse,
     LogTailResponse,
@@ -23,6 +22,7 @@ from .schemas import (
     ProviderDiagnosticResponse,
     QueueMetricsResponse,
 )
+from .services_app_settings import apply_provider_settings
 from .utils_logs import tail_lines
 
 _APP_STARTED_AT = time.monotonic()
@@ -112,18 +112,24 @@ def build_monitor_status(db: Session) -> MonitorStatusResponse:
         started = time.perf_counter()
         reachable, reason = provider.healthcheck()
         latency_ms = round((time.perf_counter() - started) * 1000, 2)
-        voice_count = db.scalar(
-            select(func.count(VoiceCatalogEntry.id)).where(
-                VoiceCatalogEntry.provider_key == provider.key,
-                VoiceCatalogEntry.is_active.is_(True),
+        voice_count = (
+            db.scalar(
+                select(func.count(VoiceCatalogEntry.id)).where(
+                    VoiceCatalogEntry.provider_key == provider.key,
+                    VoiceCatalogEntry.is_active.is_(True),
+                )
             )
-        ) or 0
-        active_jobs = db.scalar(
-            select(func.count(SynthesisJob.id)).where(
-                SynthesisJob.provider_key == provider.key,
-                SynthesisJob.status.in_(["queued", "running"]),
+            or 0
+        )
+        active_jobs = (
+            db.scalar(
+                select(func.count(SynthesisJob.id)).where(
+                    SynthesisJob.provider_key == provider.key,
+                    SynthesisJob.status.in_(["queued", "running"]),
+                )
             )
-        ) or 0
+            or 0
+        )
         providers.append(
             ProviderDiagnosticResponse(
                 key=provider.key,

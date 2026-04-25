@@ -35,8 +35,25 @@ export const LibraryPage = memo(function LibraryPage({
   return (
     <Panel title={t("library.title")} description={t("library.description")}>
       <div className="filter-inline-grid">
-        <div className="form-field compact"><label>{t("library.searchResult")}</label><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder={t("library.placeholder")} /></div>
-        <div className="form-field compact"><label>{t("library.project")}</label><select value={projectFilter} onChange={(event) => setProjectFilter(event.target.value)}><option value="all">{t("common.all")}</option>{projects.map((project) => <option key={project.project_key} value={project.project_key}>{project.name}</option>)}</select></div>
+        <div className="form-field compact">
+          <label>{t("library.searchResult")}</label>
+          <input
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder={t("library.placeholder")}
+          />
+        </div>
+        <div className="form-field compact">
+          <label>{t("library.project")}</label>
+          <select value={projectFilter} onChange={(event) => setProjectFilter(event.target.value)}>
+            <option value="all">{t("common.all")}</option>
+            {projects.map((project) => (
+              <option key={project.project_key} value={project.project_key}>
+                {project.name}
+              </option>
+            ))}
+          </select>
+        </div>
       </div>
       <div className="library-grid">
         {storedResults.map((job) => (
@@ -44,7 +61,9 @@ export const LibraryPage = memo(function LibraryPage({
             <div className="project-mini-head">
               <div>
                 <strong>{job.project_name ?? job.project_key}</strong>
-                <p>{job.provider_key} · {job.provider_voice_id}</p>
+                <p>
+                  {job.provider_key} · {job.provider_voice_id}
+                </p>
               </div>
               <span className="tiny-badge tiny-badge-cloud">{job.output_format}</span>
             </div>
@@ -54,8 +73,17 @@ export const LibraryPage = memo(function LibraryPage({
               <span>{formatJobDuration(job.duration_seconds)}</span>
             </div>
             <div className="actions-row">
-              <a className="ghost-button compact-button" href={artifactUrl(job.artifact!.download_url)} target="_blank" rel="noreferrer">{t("common.open")}</a>
-              <a className="primary-link" href={artifactUrl(job.artifact!.download_url)} download>{t("common.download")}</a>
+              <a
+                className="ghost-button compact-button"
+                href={artifactUrl(job.artifact!.download_url)}
+                target="_blank"
+                rel="noreferrer"
+              >
+                {t("common.open")}
+              </a>
+              <a className="primary-link" href={artifactUrl(job.artifact!.download_url)} download>
+                {t("common.download")}
+              </a>
             </div>
           </article>
         ))}

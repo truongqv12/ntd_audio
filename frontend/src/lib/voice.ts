@@ -53,11 +53,22 @@ export function getVoiceInitials(voice: VoiceCatalogEntry) {
   const text = voice.display_name.trim();
   if (!text) return "VF";
   const parts = text.split(/[\s/]+/).filter(Boolean);
-  return parts.slice(0, 2).map((part) => part[0]?.toUpperCase() ?? "").join("") || "VF";
+  return (
+    parts
+      .slice(0, 2)
+      .map((part) => part[0]?.toUpperCase() ?? "")
+      .join("") || "VF"
+  );
 }
 
 export function getVoiceLocalesForProvider(voices: VoiceCatalogEntry[], providerKey: string) {
-  return [...new Set(voices.filter((voice) => voice.provider_key === providerKey).map((voice) => voice.locale || voice.language || "unknown"))];
+  return [
+    ...new Set(
+      voices
+        .filter((voice) => voice.provider_key === providerKey)
+        .map((voice) => voice.locale || voice.language || "unknown"),
+    ),
+  ];
 }
 
 export function formatLocaleLabel(locale: string | null | undefined, uiLocale: string) {

@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import logging
-from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeoutError
+from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import TimeoutError as FutureTimeoutError
 from datetime import datetime
 from urllib.parse import quote
 
@@ -10,7 +11,6 @@ from sqlalchemy.orm import Session
 
 from .config import settings
 from .models import VoiceCatalogEntry
-from .services_app_settings import apply_provider_settings
 from .provider_registry import list_providers
 from .schemas import (
     CatalogResponse,
@@ -19,6 +19,7 @@ from .schemas import (
     VoiceCatalogEntryResponse,
     VoiceSearchResponse,
 )
+from .services_app_settings import apply_provider_settings
 
 logger = logging.getLogger(__name__)
 
@@ -32,7 +33,7 @@ def _list_voices_with_timeout(provider, timeout_seconds: float):
         except FutureTimeoutError:
             logger.warning("provider_list_voices_timeout provider=%s timeout=%s", provider.key, timeout_seconds)
             return []
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             logger.warning("provider_list_voices_error provider=%s error=%s", provider.key, exc)
             return []
 
@@ -112,7 +113,11 @@ def refresh_catalog(db: Session) -> CatalogResponse:
             row.age = voice.age
             row.styles = voice.styles
             row.tags = voice.tags
-            row.preview_url = voice.preview_url or (f"/providers/{provider.key}/voices/{quote(str(voice.id), safe='')}/preview" if provider.category == "self_hosted" else None)
+            row.preview_url = voice.preview_url or (
+                f"/providers/{provider.key}/voices/{quote(str(voice.id), safe='')}/preview"
+                if provider.category == "self_hosted"
+                else None
+            )
             row.capabilities = provider.capabilities.to_dict()
             row.provider_metadata = voice.metadata
             row.is_active = True

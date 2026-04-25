@@ -11,13 +11,10 @@ from sqlalchemy.orm import Session
 
 from .models import Project, ProjectScriptRow, SynthesisJob, VoiceCatalogEntry
 from .schemas import (
-    ArtifactResponse,
-    JobEventResponse,
     JobResponse,
     ProjectBatchQueueResponse,
     ProjectMergeResponse,
     ProjectRowsResponse,
-    ProjectScriptRowBase,
     ProjectScriptRowResponse,
     QueueProjectRowsRequest,
     UpsertProjectRowsRequest,
@@ -57,7 +54,11 @@ def list_project_rows(db: Session, project_key: str) -> ProjectRowsResponse | No
     project = db.scalar(select(Project).where(Project.project_key == project_key))
     if not project:
         return None
-    rows = db.scalars(select(ProjectScriptRow).where(ProjectScriptRow.project_id == project.id).order_by(ProjectScriptRow.row_index.asc())).all()
+    rows = db.scalars(
+        select(ProjectScriptRow)
+        .where(ProjectScriptRow.project_id == project.id)
+        .order_by(ProjectScriptRow.row_index.asc())
+    ).all()
     return ProjectRowsResponse(items=[_serialize_row(project, row) for row in rows])
 
 
@@ -83,11 +84,17 @@ def replace_project_rows(db: Session, project_key: str, payload: UpsertProjectRo
     return list_project_rows(db, project_key)  # type: ignore[return-value]
 
 
-def queue_project_rows(db: Session, project_key: str, payload: QueueProjectRowsRequest) -> ProjectBatchQueueResponse | None:
+def queue_project_rows(
+    db: Session, project_key: str, payload: QueueProjectRowsRequest
+) -> ProjectBatchQueueResponse | None:
     project = db.scalar(select(Project).where(Project.project_key == project_key))
     if not project:
         return None
-    stmt = select(ProjectScriptRow).where(ProjectScriptRow.project_id == project.id, ProjectScriptRow.is_enabled.is_(True)).order_by(ProjectScriptRow.row_index.asc())
+    stmt = (
+        select(ProjectScriptRow)
+        .where(ProjectScriptRow.project_id == project.id, ProjectScriptRow.is_enabled.is_(True))
+        .order_by(ProjectScriptRow.row_index.asc())
+    )
     rows = db.scalars(stmt).all()
     if payload.row_ids:
         allowed = set(payload.row_ids)
@@ -147,7 +154,9 @@ def project_row_artifact_path(db: Session, project_key: str, row_id: str) -> Pat
     project = db.scalar(select(Project).where(Project.project_key == project_key))
     if not project:
         return None
-    row = db.scalar(select(ProjectScriptRow).where(ProjectScriptRow.project_id == project.id, ProjectScriptRow.id == row_id))
+    row = db.scalar(
+        select(ProjectScriptRow).where(ProjectScriptRow.project_id == project.id, ProjectScriptRow.id == row_id)
+    )
     if not row or not row.last_artifact_relative_path:
         return None
     return artifact_absolute_path(row.last_artifact_relative_path)
@@ -182,19 +191,42 @@ def merge_project_rows(db: Session, project_key: str, payload: QueueProjectRowsR
         for idx, row in enumerate(rows):
             source = artifact_absolute_path(row.last_artifact_relative_path)
             intermediate = Path(tmpdir) / f"row_{idx}.wav"
-            subprocess.run(["ffmpeg", "-y", "-i", str(source), str(intermediate)], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            subprocess.run(
+                ["ffmpeg", "-y", "-i", str(source), str(intermediate)],
+                check=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+            )
             normalized_files.append(intermediate)
             if silence_ms > 0 and idx < len(rows) - 1:
                 silence = Path(tmpdir) / f"silence_{idx}.wav"
-                subprocess.run([
-                    "ffmpeg", "-y", "-f", "lavfi", "-i", f"anullsrc=r=24000:cl=mono", "-t", str(silence_ms / 1000), str(silence)
-                ], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                subprocess.run(
+                    [
+                        "ffmpeg",
+                        "-y",
+                        "-f",
+                        "lavfi",
+                        "-i",
+                        "anullsrc=r=24000:cl=mono",
+                        "-t",
+                        str(silence_ms / 1000),
+                        str(silence),
+                    ],
+                    check=True,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                )
                 normalized_files.append(silence)
         manifest.write_text("\n".join([f"file '{item}'" for item in normalized_files]), encoding="utf-8")
-        subprocess.run([
-            "ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", str(manifest), str(merged_path)
-        ], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        relative_path, _, _ = write_artifact(provider_key="project-merge", suffix=output_format, content=merged_path.read_bytes())
+        subprocess.run(
+            ["ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", str(manifest), str(merged_path)],
+            check=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+        relative_path, _, _ = write_artifact(
+            provider_key="project-merge", suffix=output_format, content=merged_path.read_bytes()
+        )
     return ProjectMergeResponse(
         project_key=project.project_key,
         merged_count=len(rows),

@@ -58,11 +58,26 @@ export const MonitorPage = memo(function MonitorPage() {
       <Panel title={t("monitorPage.title")} description={t("monitorPage.description")}>
         {error ? <div className="alert-banner">{error}</div> : null}
         <div className="stat-grid">
-          <div className="stat-card"><span>{t("monitorPage.totalJobs")}</span><strong>{status?.queue.total_jobs ?? 0}</strong></div>
-          <div className="stat-card"><span>{t("monitorPage.queuedJobs")}</span><strong>{status?.queue.queued_jobs ?? 0}</strong></div>
-          <div className="stat-card"><span>{t("monitorPage.runningJobs")}</span><strong>{status?.queue.running_jobs ?? 0}</strong></div>
-          <div className="stat-card"><span>{t("monitorPage.failedJobs")}</span><strong>{status?.queue.failed_jobs ?? 0}</strong></div>
-          <div className="stat-card"><span>{t("monitorPage.uptime")}</span><strong>{Math.round(status?.uptime_seconds ?? 0)}s</strong></div>
+          <div className="stat-card">
+            <span>{t("monitorPage.totalJobs")}</span>
+            <strong>{status?.queue.total_jobs ?? 0}</strong>
+          </div>
+          <div className="stat-card">
+            <span>{t("monitorPage.queuedJobs")}</span>
+            <strong>{status?.queue.queued_jobs ?? 0}</strong>
+          </div>
+          <div className="stat-card">
+            <span>{t("monitorPage.runningJobs")}</span>
+            <strong>{status?.queue.running_jobs ?? 0}</strong>
+          </div>
+          <div className="stat-card">
+            <span>{t("monitorPage.failedJobs")}</span>
+            <strong>{status?.queue.failed_jobs ?? 0}</strong>
+          </div>
+          <div className="stat-card">
+            <span>{t("monitorPage.uptime")}</span>
+            <strong>{Math.round(status?.uptime_seconds ?? 0)}s</strong>
+          </div>
         </div>
         <div className="section-divider" />
         <div className="provider-stack-grid provider-stack-grid-wide">
@@ -82,7 +97,11 @@ export const MonitorPage = memo(function MonitorPage() {
               </div>
               <p className="muted-copy compact-copy">{provider.reason}</p>
               <div className="chip-row">
-                {capabilityBadges(provider.capabilities).map((item) => <span className="chip" key={item}>{t(`common.${item}`)}</span>)}
+                {capabilityBadges(provider.capabilities).map((item) => (
+                  <span className="chip" key={item}>
+                    {t(`common.${item}`)}
+                  </span>
+                ))}
               </div>
             </div>
           ))}
@@ -108,13 +127,19 @@ export const MonitorPage = memo(function MonitorPage() {
           <span className="muted-copy">{logs?.source_label ?? selectedSource}</span>
         </div>
         <div className="code-block log-viewer">
-          {logs?.lines.length ? logs.lines.map((line, index) => <div key={`${index}-${line.slice(0, 20)}`}>{line}</div>) : <div>{t("monitorPage.noLogs")}</div>}
+          {logs?.lines.length ? (
+            logs.lines.map((line, index) => <div key={`${index}-${line.slice(0, 20)}`}>{line}</div>)
+          ) : (
+            <div>{t("monitorPage.noLogs")}</div>
+          )}
         </div>
       </Panel>
 
       <Panel title={t("monitorPage.guidanceTitle")} description={t("monitorPage.guidanceDescription")}>
         <ul className="guidance-list">
-          {status?.guidance.map((item, index) => <li key={index}>{item}</li>)}
+          {status?.guidance.map((item, index) => (
+            <li key={index}>{item}</li>
+          ))}
         </ul>
       </Panel>
     </div>

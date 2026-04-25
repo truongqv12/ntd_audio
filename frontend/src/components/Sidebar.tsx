@@ -46,9 +46,18 @@ export const Sidebar = memo(function Sidebar({
 
       <div className="sidebar-status panel-surface">
         <h3>{t("sidebar.workspace")}</h3>
-        <div className="metric-line"><span>{t("sidebar.providers")}</span><strong>{healthyProviders}</strong></div>
-        <div className="metric-line"><span>{t("sidebar.activeJobs")}</span><strong>{activeJobs}</strong></div>
-        <div className="metric-line"><span>{t("sidebar.projects")}</span><strong>{projectCount}</strong></div>
+        <div className="metric-line">
+          <span>{t("sidebar.providers")}</span>
+          <strong>{healthyProviders}</strong>
+        </div>
+        <div className="metric-line">
+          <span>{t("sidebar.activeJobs")}</span>
+          <strong>{activeJobs}</strong>
+        </div>
+        <div className="metric-line">
+          <span>{t("sidebar.projects")}</span>
+          <strong>{projectCount}</strong>
+        </div>
       </div>
 
       <div className="sidebar-footer panel-surface">

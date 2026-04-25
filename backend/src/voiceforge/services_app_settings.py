@@ -12,6 +12,7 @@ from .provider_registry import list_providers
 from .providers_params import get_all_parameter_schemas
 from .runtime_settings import set_all_provider_runtime_configs
 from .schemas import ProviderCredentialResponse, SettingsOverviewResponse
+from .security.encryption import decrypt_value, encrypt_value
 
 PROVIDER_CREDENTIAL_FIELDS: dict[str, dict[str, dict[str, Any]]] = {
     "openai_tts": {
@@ -52,18 +53,43 @@ DEFAULT_MERGE_SETTINGS = {
 }
 
 
+def _secret_field_names(namespace: str, key: str) -> set[str]:
+    if namespace != "provider_credentials":
+        return set()
+    fields = PROVIDER_CREDENTIAL_FIELDS.get(key, {})
+    return {name for name, meta in fields.items() if meta.get("secret")}
+
+
+def _decrypt_stored(value: dict[str, Any], secret_fields: set[str]) -> dict[str, Any]:
+    if not value or not secret_fields:
+        return value
+    return {k: (decrypt_value(v) if k in secret_fields else v) for k, v in value.items()}
+
+
+def _encrypt_for_storage(value: dict[str, Any], secret_fields: set[str]) -> dict[str, Any]:
+    if not value or not secret_fields:
+        return value
+    return {k: (encrypt_value(v) if k in secret_fields and isinstance(v, str) else v) for k, v in value.items()}
+
+
 def _get_setting(db: Session, namespace: str, key: str) -> dict[str, Any]:
     row = db.scalar(select(AppSetting).where(AppSetting.namespace == namespace, AppSetting.key == key))
-    return dict(row.value_json or {}) if row else {}
+    if not row:
+        return {}
+    raw = dict(row.value_json or {})
+    return _decrypt_stored(raw, _secret_field_names(namespace, key))
 
 
-def _upsert_setting(db: Session, namespace: str, key: str, value: dict[str, Any], *, is_secret: bool = False) -> AppSetting:
+def _upsert_setting(
+    db: Session, namespace: str, key: str, value: dict[str, Any], *, is_secret: bool = False
+) -> AppSetting:
+    payload = _encrypt_for_storage(value, _secret_field_names(namespace, key))
     row = db.scalar(select(AppSetting).where(AppSetting.namespace == namespace, AppSetting.key == key))
     if row is None:
-        row = AppSetting(namespace=namespace, key=key, value_json=value, is_secret=is_secret)
+        row = AppSetting(namespace=namespace, key=key, value_json=payload, is_secret=is_secret)
         db.add(row)
     else:
-        row.value_json = value
+        row.value_json = payload
         row.is_secret = is_secret
         row.updated_at = datetime.utcnow()
     db.commit()

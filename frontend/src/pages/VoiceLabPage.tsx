@@ -6,7 +6,10 @@ import { useI18n } from "../i18n";
 export const VoiceLabPage = memo(function VoiceLabPage({ providers }: { providers: ProviderSummary[] }) {
   const { t } = useI18n();
   const customVoiceProviders = useMemo(
-    () => providers.filter((provider) => provider.capabilities.custom_voice || provider.capabilities.voice_cloning),
+    () =>
+      providers.filter(
+        (provider) => provider.capabilities.custom_voice || provider.capabilities.voice_cloning,
+      ),
     [providers],
   );
 
@@ -14,9 +17,18 @@ export const VoiceLabPage = memo(function VoiceLabPage({ providers }: { provider
     <div className="page-grid two-up">
       <Panel title={t("voiceLab.title")} description={t("voiceLab.description")}>
         <div className="voice-lab-flow">
-          <div className="lab-step-card"><strong>{t("voiceLab.step1Title")}</strong><p>{t("voiceLab.step1Body")}</p></div>
-          <div className="lab-step-card"><strong>{t("voiceLab.step2Title")}</strong><p>{t("voiceLab.step2Body")}</p></div>
-          <div className="lab-step-card"><strong>{t("voiceLab.step3Title")}</strong><p>{t("voiceLab.step3Body")}</p></div>
+          <div className="lab-step-card">
+            <strong>{t("voiceLab.step1Title")}</strong>
+            <p>{t("voiceLab.step1Body")}</p>
+          </div>
+          <div className="lab-step-card">
+            <strong>{t("voiceLab.step2Title")}</strong>
+            <p>{t("voiceLab.step2Body")}</p>
+          </div>
+          <div className="lab-step-card">
+            <strong>{t("voiceLab.step3Title")}</strong>
+            <p>{t("voiceLab.step3Body")}</p>
+          </div>
         </div>
         <div className="section-divider" />
         <div className="research-note-card">
@@ -36,12 +48,18 @@ export const VoiceLabPage = memo(function VoiceLabPage({ providers }: { provider
                 <span className="tiny-badge tiny-badge-cloud">voice-lab</span>
               </div>
               <div className="chip-row">
-                {provider.capabilities.custom_voice ? <span className="chip">{t("voiceLab.customVoice")}</span> : null}
-                {provider.capabilities.voice_cloning ? <span className="chip">{t("voiceLab.cloning")}</span> : null}
+                {provider.capabilities.custom_voice ? (
+                  <span className="chip">{t("voiceLab.customVoice")}</span>
+                ) : null}
+                {provider.capabilities.voice_cloning ? (
+                  <span className="chip">{t("voiceLab.cloning")}</span>
+                ) : null}
               </div>
             </div>
           ))}
-          {customVoiceProviders.length === 0 ? <p className="muted-copy">{t("voiceLab.noEligible")}</p> : null}
+          {customVoiceProviders.length === 0 ? (
+            <p className="muted-copy">{t("voiceLab.noEligible")}</p>
+          ) : null}
         </div>
       </Panel>
     </div>

@@ -3,7 +3,9 @@ SHELL := /bin/bash
 .PHONY: help backend worker frontend docker-up docker-up-gpu docker-up-oss \
         migrate migrate-down migrate-status migrate-history \
         migrate-revision migrate-autogenerate migrate-reset migrate-docker \
-        db-backup db-restore version
+        db-backup db-restore version \
+        install-dev lint format typecheck test \
+        bump-patch bump-minor bump-major changelog
 
 help:                    ## list available targets
 	@grep -E '^[a-zA-Z_-]+:.*## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*## "}; {printf "  \033[36m%-26s\033[0m %s\n", $$1, $$2}'
@@ -64,6 +66,42 @@ db-backup:               ## pg_dump compose DB to ./backups/<timestamp>.sql.gz
 db-restore:              ## restore from a backup file; usage: make db-restore f=backups/xxx.sql.gz
 	@if [ -z "$(f)" ]; then echo "Usage: make db-restore f=backups/xxx.sql.gz"; exit 1; fi
 	./scripts/db_restore.sh $(f)
+
+# === Quality gate ===
+install-dev:             ## install backend + frontend dev deps
+	cd backend && python3 -m venv .venv && .venv/bin/pip install -r requirements-dev.txt
+	cd frontend && npm install --no-audit --no-fund
+	pre-commit install || true
+
+lint:                    ## ruff (backend) + eslint (frontend)
+	cd backend && .venv/bin/ruff check src tests
+	cd frontend && npm run lint
+
+format:                  ## black + ruff format (backend) + prettier (frontend)
+	cd backend && .venv/bin/ruff check src tests --fix
+	cd backend && .venv/bin/black src tests
+	cd frontend && npm run format
+
+typecheck:               ## mypy (backend) + tsc (frontend)
+	cd backend && .venv/bin/mypy src
+	cd frontend && npm run typecheck
+
+test:                    ## pytest (backend) + vitest (frontend)
+	cd backend && .venv/bin/pytest -q
+	cd frontend && npm test
+
+# === Versioning ===
+bump-patch:              ## bump backend VERSION patch + tag
+	./scripts/bump_version.sh patch
+
+bump-minor:              ## bump backend VERSION minor + tag
+	./scripts/bump_version.sh minor
+
+bump-major:              ## bump backend VERSION major + tag
+	./scripts/bump_version.sh major
+
+changelog:               ## print CHANGELOG.md
+	@cat CHANGELOG.md
 
 # === Misc ===
 version:                 ## show backend VERSION

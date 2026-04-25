@@ -67,7 +67,9 @@ class VoicevoxProvider:
                 )
         return voices
 
-    def synthesize(self, *, text: str, voice_id: str, output_format: str = "wav", params: dict | None = None) -> SynthesisResult:
+    def synthesize(
+        self, *, text: str, voice_id: str, output_format: str = "wav", params: dict | None = None
+    ) -> SynthesisResult:
         params = params or {}
         speaker = int(voice_id)
         with httpx.Client(timeout=settings.voicevox_timeout_seconds) as client:
@@ -77,7 +79,14 @@ class VoicevoxProvider:
             )
             query_response.raise_for_status()
             query = query_response.json()
-            for key in ("speedScale", "pitchScale", "intonationScale", "volumeScale", "prePhonemeLength", "postPhonemeLength"):
+            for key in (
+                "speedScale",
+                "pitchScale",
+                "intonationScale",
+                "volumeScale",
+                "prePhonemeLength",
+                "postPhonemeLength",
+            ):
                 if key in params:
                     query[key] = params[key]
             synth_response = client.post(

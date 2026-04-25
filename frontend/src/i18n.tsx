@@ -3,7 +3,9 @@ import { createContext, memo, type ReactNode, useContext, useEffect, useMemo, us
 export type Locale = "en" | "vi";
 
 type TranslationValue = string | TranslationTree;
-interface TranslationTree { [key: string]: TranslationValue; }
+interface TranslationTree {
+  [key: string]: TranslationValue;
+}
 
 type I18nContextValue = {
   locale: Locale;
@@ -118,7 +120,8 @@ const messages: Record<Locale, TranslationTree> = {
     },
     dashboard: {
       title: "Overview",
-      description: "Keep the most frequent operator tasks visible: queue status, projects, results and failures.",
+      description:
+        "Keep the most frequent operator tasks visible: queue status, projects, results and failures.",
       totalJobs: "Total jobs",
       activeJobs: "Active jobs",
       storedResults: "Stored results",
@@ -135,7 +138,8 @@ const messages: Record<Locale, TranslationTree> = {
     },
     createJob: {
       title: "Create synthesis job",
-      description: "Project-first flow: choose a project, pick an engine voice in a dedicated picker, then tune only the fields the provider needs.",
+      description:
+        "Project-first flow: choose a project, pick an engine voice in a dedicated picker, then tune only the fields the provider needs.",
       projectContextFallback: "Use projects to keep defaults, results and voice strategy together.",
       defaultProvider: "Default provider",
       scriptLabel: "Script / source text",
@@ -171,7 +175,8 @@ const messages: Record<Locale, TranslationTree> = {
     },
     jobsPage: {
       title: "Jobs",
-      description: "Monitor status, open audio, download results, and inspect job-level history without leaving the page.",
+      description:
+        "Monitor status, open audio, download results, and inspect job-level history without leaving the page.",
       detailTitle: "Job detail",
       detailDescription: "Keep parameters, artifact access and event timeline together.",
       selectJob: "Select a job to inspect its timeline and settings.",
@@ -200,7 +205,8 @@ const messages: Record<Locale, TranslationTree> = {
     },
     projectsPage: {
       title: "Projects",
-      description: "Projects are the operational unit: defaults, ownership, results and monitoring all anchor here.",
+      description:
+        "Projects are the operational unit: defaults, ownership, results and monitoring all anchor here.",
       createTitle: "Create project",
       createDescription: "Make setup reusable. Defaults here should remove steps from Create Job later.",
       projectKey: "Project key",
@@ -224,7 +230,8 @@ const messages: Record<Locale, TranslationTree> = {
     },
     providersPage: {
       title: "Providers",
-      description: "Use this page as the operational map for engine health, capability fit, and deployment readiness.",
+      description:
+        "Use this page as the operational map for engine health, capability fit, and deployment readiness.",
     },
     settingsPage: {
       title: "Workspace defaults",
@@ -247,7 +254,8 @@ const messages: Record<Locale, TranslationTree> = {
       step3Title: "3. Create and review",
       step3Body: "Draft voices should support test prompts, QA checks and publish gates.",
       cloneResearchTitle: "Clone voice research direction",
-      cloneResearchBody: "Start with a draft-only workflow: consent → reference validation → test prompts → publish to project catalog. Do not mix cloning directly into the normal create-job form.",
+      cloneResearchBody:
+        "Start with a draft-only workflow: consent → reference validation → test prompts → publish to project catalog. Do not mix cloning directly into the normal create-job form.",
       noEligible: "No providers with custom voice support are currently configured.",
       customVoice: "custom voice",
       cloning: "cloning",
@@ -262,7 +270,8 @@ const messages: Record<Locale, TranslationTree> = {
     },
     voicePicker: {
       title: "Voice engine & voice picker",
-      description: "Step 1: choose an engine. Step 2: narrow by country / locale. Step 3: compare voices with avatar, traits, and preview support.",
+      description:
+        "Step 1: choose an engine. Step 2: narrow by country / locale. Step 3: compare voices with avatar, traits, and preview support.",
       engineList: "Voice engines",
       localeList: "Available countries / locales",
       voiceList: "Voices",
@@ -290,7 +299,8 @@ const messages: Record<Locale, TranslationTree> = {
       logsDescription: "Tail the API/worker log file directly from the app.",
       noLogs: "No logs available yet.",
       guidanceTitle: "Scale-out guidance",
-      guidanceDescription: "Notes for later when you move from private self-host to public-facing infrastructure.",
+      guidanceDescription:
+        "Notes for later when you move from private self-host to public-facing infrastructure.",
     },
     tables: {
       id: "ID",
@@ -423,7 +433,8 @@ const messages: Record<Locale, TranslationTree> = {
     },
     createJob: {
       title: "Tạo job sinh voice",
-      description: "Luồng project-first: chọn project, mở bộ chọn engine/voice riêng, rồi chỉ chỉnh các tham số đúng với provider đang dùng.",
+      description:
+        "Luồng project-first: chọn project, mở bộ chọn engine/voice riêng, rồi chỉ chỉnh các tham số đúng với provider đang dùng.",
       projectContextFallback: "Dùng project để gom mặc định, kết quả và chiến lược dùng voice.",
       defaultProvider: "Provider mặc định",
       scriptLabel: "Nội dung / source text",
@@ -531,18 +542,21 @@ const messages: Record<Locale, TranslationTree> = {
       step1Title: "1. Chọn provider đích",
       step1Body: "Giới hạn danh sách vào các engine có thể tạo hoặc clone voice.",
       step2Title: "2. Thêm dữ liệu nguồn",
-      step2Body: "Audio tham chiếu, metadata nhận diện voice và trạng thái consent nên nằm trong một flow có hướng dẫn.",
+      step2Body:
+        "Audio tham chiếu, metadata nhận diện voice và trạng thái consent nên nằm trong một flow có hướng dẫn.",
       step3Title: "3. Tạo và review",
       step3Body: "Voice ở trạng thái draft cần có test prompt, kiểm tra chất lượng và bước publish.",
       cloneResearchTitle: "Ý tưởng nghiên cứu clone voice",
-      cloneResearchBody: "Nên bắt đầu bằng workflow draft-only: consent → kiểm tra audio nguồn → test prompt → publish vào catalog của project. Không nên trộn flow clone vào form tạo job bình thường.",
+      cloneResearchBody:
+        "Nên bắt đầu bằng workflow draft-only: consent → kiểm tra audio nguồn → test prompt → publish vào catalog của project. Không nên trộn flow clone vào form tạo job bình thường.",
       noEligible: "Chưa có provider nào hỗ trợ custom voice được cấu hình.",
       customVoice: "custom voice",
       cloning: "clone voice",
     },
     voicesPage: {
       title: "Kho voice",
-      description: "Dùng trang này để so sánh engine, quốc gia/locale, khả năng nghe thử và đặc tính của voice.",
+      description:
+        "Dùng trang này để so sánh engine, quốc gia/locale, khả năng nghe thử và đặc tính của voice.",
       detailTitle: "Chi tiết voice",
       detailDescription: "Giữ metadata và khả năng preview luôn hiện trong lúc so sánh nhiều engine.",
       openPicker: "Mở bộ chọn voice toàn màn hình",
@@ -550,7 +564,8 @@ const messages: Record<Locale, TranslationTree> = {
     },
     voicePicker: {
       title: "Bộ chọn engine & voice",
-      description: "Bước 1: chọn engine. Bước 2: lọc theo quốc gia / locale. Bước 3: so sánh voice bằng avatar, trait và khả năng nghe thử.",
+      description:
+        "Bước 1: chọn engine. Bước 2: lọc theo quốc gia / locale. Bước 3: so sánh voice bằng avatar, trait và khả năng nghe thử.",
       engineList: "Danh sách engine",
       localeList: "Quốc gia / locale khả dụng",
       voiceList: "Danh sách voice",

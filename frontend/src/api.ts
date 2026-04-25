@@ -23,20 +23,31 @@ export async function fetchSettingsOverview(): Promise<import("./types").Setting
   return response.json();
 }
 
-export async function fetchVoiceParameterSchemas(): Promise<Record<string, import("./types").ProviderParamField[]>> {
+export async function fetchVoiceParameterSchemas(): Promise<
+  Record<string, import("./types").ProviderParamField[]>
+> {
   const response = await fetch(`${API_BASE}/settings/voice-parameter-schemas`);
   if (!response.ok) throw new Error("Unable to fetch voice parameter schemas");
   const data = await response.json();
   return data.schemas;
 }
 
-export async function updateProviderCredentials(providerKey: string, fields: Record<string, unknown>): Promise<import("./types").ProviderCredential> {
-  const response = await fetch(`${API_BASE}/settings/provider-credentials/${encodeURIComponent(providerKey)}`, {
-    method: "PUT",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ fields }),
-  });
-  if (!response.ok) { const text = await response.text(); throw new Error(text || "Unable to update provider credentials"); }
+export async function updateProviderCredentials(
+  providerKey: string,
+  fields: Record<string, unknown>,
+): Promise<import("./types").ProviderCredential> {
+  const response = await fetch(
+    `${API_BASE}/settings/provider-credentials/${encodeURIComponent(providerKey)}`,
+    {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ fields }),
+    },
+  );
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(text || "Unable to update provider credentials");
+  }
   return response.json();
 }
 
@@ -46,7 +57,10 @@ export async function updateMergeDefaults(fields: Record<string, unknown>): Prom
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(fields),
   });
-  if (!response.ok) { const text = await response.text(); throw new Error(text || "Unable to update merge defaults"); }
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(text || "Unable to update merge defaults");
+  }
   return response.json();
 }
 
@@ -138,7 +152,6 @@ export async function updateProject(projectKey: string, payload: Record<string, 
   return response.json();
 }
 
-
 export async function fetchProjectRows(projectKey: string): Promise<ProjectScriptRow[]> {
   const response = await fetch(`${API_BASE}/projects/${projectKey}/rows`);
   if (!response.ok) throw new Error("Unable to fetch project rows");
@@ -146,43 +159,61 @@ export async function fetchProjectRows(projectKey: string): Promise<ProjectScrip
   return data.items;
 }
 
-export async function replaceProjectRows(projectKey: string, rows: Array<Record<string, unknown>>): Promise<ProjectScriptRow[]> {
+export async function replaceProjectRows(
+  projectKey: string,
+  rows: Array<Record<string, unknown>>,
+): Promise<ProjectScriptRow[]> {
   const response = await fetch(`${API_BASE}/projects/${projectKey}/rows`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ rows }),
   });
-  if (!response.ok) { const text = await response.text(); throw new Error(text || "Unable to save project rows"); }
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(text || "Unable to save project rows");
+  }
   const data = await response.json();
   return data.items;
 }
 
-export async function queueProjectRows(projectKey: string, payload: {
-  row_ids?: string[];
-  merge_outputs?: boolean;
-  merge_output_format?: string;
-  merge_silence_ms?: number;
-}): Promise<ProjectBatchQueueResponse> {
+export async function queueProjectRows(
+  projectKey: string,
+  payload: {
+    row_ids?: string[];
+    merge_outputs?: boolean;
+    merge_output_format?: string;
+    merge_silence_ms?: number;
+  },
+): Promise<ProjectBatchQueueResponse> {
   const response = await fetch(`${API_BASE}/projects/${projectKey}/rows/queue`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
   });
-  if (!response.ok) { const text = await response.text(); throw new Error(text || "Unable to queue project rows"); }
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(text || "Unable to queue project rows");
+  }
   return response.json();
 }
 
-export async function mergeProjectRows(projectKey: string, payload: {
-  row_ids?: string[];
-  merge_output_format?: string;
-  merge_silence_ms?: number;
-}): Promise<ProjectMergeResponse> {
+export async function mergeProjectRows(
+  projectKey: string,
+  payload: {
+    row_ids?: string[];
+    merge_output_format?: string;
+    merge_silence_ms?: number;
+  },
+): Promise<ProjectMergeResponse> {
   const response = await fetch(`${API_BASE}/projects/${projectKey}/rows/merge`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
   });
-  if (!response.ok) { const text = await response.text(); throw new Error(text || "Unable to merge project rows"); }
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(text || "Unable to merge project rows");
+  }
   return response.json();
 }
 
@@ -205,7 +236,9 @@ export async function fetchMonitorLogSources(): Promise<LogSource[]> {
 }
 
 export async function fetchMonitorLogs(source = "api", limit = 200): Promise<LogTail> {
-  const response = await fetch(`${API_BASE}/monitor/logs?source=${encodeURIComponent(source)}&limit=${limit}`);
+  const response = await fetch(
+    `${API_BASE}/monitor/logs?source=${encodeURIComponent(source)}&limit=${limit}`,
+  );
   if (!response.ok) throw new Error("Unable to fetch logs");
   return response.json();
 }

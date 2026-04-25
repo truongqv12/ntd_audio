@@ -6,9 +6,9 @@ from sqlalchemy.orm import Session
 
 from .config import settings
 from .db import get_db
-from .services_app_settings import apply_provider_settings
 from .provider_registry import get_provider, list_providers
 from .schemas import ProviderCapabilitiesResponse, ProviderSummaryResponse, VoiceCatalogEntryResponse
+from .services_app_settings import apply_provider_settings
 
 router = APIRouter(prefix="/providers", tags=["providers"])
 
@@ -76,7 +76,9 @@ def get_provider_voices(provider_key: str, db: Session = Depends(get_db)) -> lis
 
 
 @router.get("/{provider_key}/voices/{voice_id:path}/preview")
-def preview_provider_voice(provider_key: str, voice_id: str, text: str | None = Query(default=None), db: Session = Depends(get_db)):
+def preview_provider_voice(
+    provider_key: str, voice_id: str, text: str | None = Query(default=None), db: Session = Depends(get_db)
+):
     apply_provider_settings(db)
     try:
         provider = get_provider(provider_key)
@@ -92,7 +94,7 @@ def preview_provider_voice(provider_key: str, voice_id: str, text: str | None = 
     sample_text = text or _preview_text_for_voice(serialized)
     try:
         result = provider.synthesize(text=sample_text, voice_id=voice_id, output_format="wav", params={})
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
 
     return Response(content=result.audio_bytes, media_type=result.mime_type)

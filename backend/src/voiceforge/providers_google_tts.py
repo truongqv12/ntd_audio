@@ -76,14 +76,23 @@ class GoogleCloudTTSProvider:
             )
         return voices
 
-    def synthesize(self, *, text: str, voice_id: str, output_format: str = "mp3", params: dict | None = None) -> SynthesisResult:
+    def synthesize(
+        self, *, text: str, voice_id: str, output_format: str = "mp3", params: dict | None = None
+    ) -> SynthesisResult:
         cfg = self._cfg()
         if not cfg.get("google_tts_access_token"):
             raise RuntimeError("GOOGLE_TTS_ACCESS_TOKEN missing")
         locale = (params or {}).get("locale") or "-".join(voice_id.split("-")[:2]) or "en-US"
         audio_encoding = "MP3" if output_format == "mp3" else "LINEAR16"
         audio_config = {"audioEncoding": audio_encoding}
-        for src, dst in (("speakingRate", "speakingRate"), ("speaking_rate", "speakingRate"), ("pitch", "pitch"), ("volumeGainDb", "volumeGainDb"), ("volume_gain_db", "volumeGainDb"), ("sampleRateHertz", "sampleRateHertz")):
+        for src, dst in (
+            ("speakingRate", "speakingRate"),
+            ("speaking_rate", "speakingRate"),
+            ("pitch", "pitch"),
+            ("volumeGainDb", "volumeGainDb"),
+            ("volume_gain_db", "volumeGainDb"),
+            ("sampleRateHertz", "sampleRateHertz"),
+        ):
             if params and params.get(src) not in (None, "", 0 if src == "sampleRateHertz" else None):
                 audio_config[dst] = params[src]
         advanced = {}
