@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  cancelJob as cancelJobApi,
   createJob,
   createProject,
   fetchCatalog,
@@ -8,6 +9,7 @@ import {
   fetchSettingsOverview,
   fetchProviders,
   openEventStream,
+  retryJob as retryJobApi,
   updateProject,
 } from "../api";
 import type {
@@ -282,6 +284,31 @@ export function useStudioController() {
     }
   }, []);
 
+  const cancelJobAction = useCallback(async (jobId: string) => {
+    try {
+      setErrorMessage(null);
+      const updated = await cancelJobApi(jobId);
+      setJobs((current) => current.map((item) => (item.id === updated.id ? updated : item)));
+      return updated;
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "Unable to cancel job");
+      return null;
+    }
+  }, []);
+
+  const retryJobAction = useCallback(async (jobId: string) => {
+    try {
+      setErrorMessage(null);
+      const newJob = await retryJobApi(jobId);
+      setJobs((current) => [newJob, ...current.filter((item) => item.id !== newJob.id)]);
+      setSelectedJobId(newJob.id);
+      return newJob;
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "Unable to retry job");
+      return null;
+    }
+  }, []);
+
   const updateProjectDefaults = useCallback(async (projectKey: string, payload: Record<string, unknown>) => {
     try {
       setErrorMessage(null);
@@ -326,6 +353,8 @@ export function useStudioController() {
     createWorkspaceProject,
     toggleArchiveProject,
     updateProjectDefaults,
+    cancelJob: cancelJobAction,
+    retryJob: retryJobAction,
     refreshCatalog: bootstrap,
   };
 }

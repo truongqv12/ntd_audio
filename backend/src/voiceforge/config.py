@@ -24,6 +24,7 @@ class Settings(BaseSettings):
         default_factory=lambda: ["http://localhost:5173"],
         alias="APP_ALLOWED_ORIGINS",
     )
+    app_api_keys: list[str] = Field(default_factory=list, alias="APP_API_KEYS")
 
     database_url: str = Field(
         default="postgresql+psycopg://postgres:postgres@postgres:5432/voiceforge",
@@ -36,6 +37,7 @@ class Settings(BaseSettings):
     cache_root: Path = Field(default=Path("/data/cache"), alias="CACHE_ROOT")
 
     app_encryption_key: str = Field(default="", alias="APP_ENCRYPTION_KEY")
+    event_stream_heartbeat_seconds: float = Field(default=15.0, alias="EVENT_STREAM_HEARTBEAT_SECONDS")
 
     log_level: str = Field(default="INFO", alias="LOG_LEVEL")
     log_file_path: Path = Field(default=Path("/data/logs/voiceforge.log"), alias="LOG_FILE_PATH")
@@ -91,9 +93,9 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
-    @field_validator("app_allowed_origins", mode="before")
+    @field_validator("app_allowed_origins", "app_api_keys", mode="before")
     @classmethod
-    def _parse_allowed_origins(cls, value: object) -> object:
+    def _split_csv(cls, value: object) -> object:
         if isinstance(value, str):
             return [item.strip() for item in value.split(",") if item.strip()]
         return value

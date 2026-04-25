@@ -63,6 +63,8 @@ function App() {
             jobs={controller.jobs}
             selectedJob={controller.selectedJob}
             onSelectJob={controller.setSelectedJob}
+            onCancelJob={controller.cancelJob}
+            onRetryJob={controller.retryJob}
           />
         );
       case "script":

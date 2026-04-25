@@ -247,6 +247,7 @@ export const ScriptEditorPage = memo(function ScriptEditorPage({
   );
   const [rows, setRows] = useState<DraftRow[]>([]);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [draggedRowId, setDraggedRowId] = useState<string | null>(null);
   const [importText, setImportText] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -415,6 +416,22 @@ export const ScriptEditorPage = memo(function ScriptEditorPage({
         const next = [...current];
         const [row] = next.splice(index, 1);
         next.splice(target, 0, row);
+        return next;
+      });
+    },
+    [updateRows],
+  );
+
+  const moveRowToIndex = useCallback(
+    (localId: string, targetIndex: number) => {
+      updateRows((current) => {
+        const fromIndex = current.findIndex((row) => row.local_id === localId);
+        if (fromIndex < 0) return current;
+        const clampedTarget = Math.max(0, Math.min(targetIndex, current.length - 1));
+        if (clampedTarget === fromIndex) return current;
+        const next = [...current];
+        const [row] = next.splice(fromIndex, 1);
+        next.splice(clampedTarget, 0, row);
         return next;
       });
     },
@@ -669,7 +686,33 @@ export const ScriptEditorPage = memo(function ScriptEditorPage({
                       ? artifactUrl(row.last_artifact_download_url)
                       : null;
                     return (
-                      <tr key={row.local_id} className={!row.is_enabled ? "script-row-disabled" : ""}>
+                      <tr
+                        key={row.local_id}
+                        className={`${!row.is_enabled ? "script-row-disabled" : ""} ${
+                          draggedRowId === row.local_id ? "script-row-dragging" : ""
+                        }`}
+                        draggable
+                        onDragStart={(event) => {
+                          setDraggedRowId(row.local_id);
+                          event.dataTransfer.effectAllowed = "move";
+                          event.dataTransfer.setData("text/plain", row.local_id);
+                        }}
+                        onDragOver={(event) => {
+                          if (draggedRowId && draggedRowId !== row.local_id) {
+                            event.preventDefault();
+                            event.dataTransfer.dropEffect = "move";
+                          }
+                        }}
+                        onDrop={(event) => {
+                          event.preventDefault();
+                          const sourceId = event.dataTransfer.getData("text/plain") || draggedRowId;
+                          if (sourceId && sourceId !== row.local_id) {
+                            moveRowToIndex(sourceId, index);
+                          }
+                          setDraggedRowId(null);
+                        }}
+                        onDragEnd={() => setDraggedRowId(null)}
+                      >
                         <td>
                           <input
                             type="checkbox"
