@@ -347,6 +347,18 @@ def build_live_signature(db: Session) -> str:
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()
 
 
+def _was_canceled_concurrently(db: Session, job: SynthesisJob) -> bool:
+    """Return True if cancel_job flipped this job to canceled while we were busy.
+
+    cancel_job runs in a separate session, so we must reload the row (under
+    Read Committed) to observe its commit. Used right before each terminal
+    transition in process_job so we don't overwrite a user-driven cancel with
+    a stale succeeded/failed.
+    """
+    db.refresh(job, attribute_names=["status"])
+    return job.status == JobStatus.canceled.value
+
+
 def process_job(db: Session, job_id: str) -> None:
     job = db.scalar(select(SynthesisJob).where(SynthesisJob.id == job_id))
     if not job:
@@ -365,6 +377,9 @@ def process_job(db: Session, job_id: str) -> None:
 
     existing_cache = db.scalar(select(GenerationCache).where(GenerationCache.cache_key == job.cache_key))
     if existing_cache:
+        if _was_canceled_concurrently(db, job):
+            logger.info("job_skipped_canceled_after_start job_id=%s", job.id)
+            return
         artifact = SynthesisArtifact(
             job_id=job.id,
             artifact_kind="audio",
@@ -427,6 +442,9 @@ def process_job(db: Session, job_id: str) -> None:
             file_size_bytes=file_size,
             sha256_hex=sha256_hex,
         )
+        if _was_canceled_concurrently(db, job):
+            logger.info("job_skipped_canceled_after_start job_id=%s", job.id)
+            return
         job.duration_seconds = result.duration_seconds
         job.status = JobStatus.succeeded.value
         job.finished_at = datetime.utcnow()
@@ -456,6 +474,9 @@ def process_job(db: Session, job_id: str) -> None:
             file_size,
         )
     except Exception as exc:
+        if _was_canceled_concurrently(db, job):
+            logger.info("job_skipped_canceled_after_start job_id=%s err=%s", job.id, exc)
+            return
         job.status = JobStatus.failed.value
         job.error_message = str(exc)
         job.finished_at = datetime.utcnow()
