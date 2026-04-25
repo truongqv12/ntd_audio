@@ -36,19 +36,23 @@ def _sync_client() -> redis.Redis | None:
     """Return a lazily-built module-level Redis client (or None if unreachable).
 
     Reusing a single client avoids leaking a fresh ``ConnectionPool`` on every
-    job state transition.
+    job state transition. Failures are *not* cached as ``None`` — the next
+    publish retries ``from_url`` so a transient outage at startup recovers
+    automatically. Warnings are rate-limited via ``_warned`` so logs don't
+    flood when Redis stays down.
     """
-    if "client" in _sync_client_cache:
-        return _sync_client_cache["client"]
+    cached = _sync_client_cache.get("client")
+    if cached is not None:
+        return cached
     try:
         client = redis.Redis.from_url(settings.redis_url, decode_responses=True)
     except Exception as exc:
         if not _warned["sync"]:
             logger.warning("events_bus_sync_unavailable url=%s err=%s", settings.redis_url, exc)
             _warned["sync"] = True
-        _sync_client_cache["client"] = None
         return None
     _sync_client_cache["client"] = client
+    _warned["sync"] = False  # reset so a future outage gets a fresh warning
     return client
 
 

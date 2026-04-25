@@ -6,7 +6,7 @@ import { InlineAudioPlayer } from "../components/InlineAudioPlayer";
 import { LiveEventList } from "../components/LiveEventList";
 import { useI18n } from "../i18n";
 
-const STATUS_TABS = ["all", "queued", "running", "succeeded", "failed"] as const;
+const STATUS_TABS = ["all", "queued", "running", "succeeded", "failed", "canceled"] as const;
 
 export const JobsPage = memo(function JobsPage({
   jobs,
@@ -35,6 +35,7 @@ export const JobsPage = memo(function JobsPage({
     running: t("jobsPage.running"),
     succeeded: t("jobsPage.succeeded"),
     failed: t("jobsPage.failed"),
+    canceled: t("jobsPage.canceled"),
   };
 
   return (
