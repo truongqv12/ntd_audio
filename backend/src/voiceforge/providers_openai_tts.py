@@ -64,7 +64,9 @@ class OpenAITTSProvider:
             for voice_id, label in OPENAI_VOICES
         ]
 
-    def synthesize(self, *, text: str, voice_id: str, output_format: str = "mp3", params: dict | None = None) -> SynthesisResult:
+    def synthesize(
+        self, *, text: str, voice_id: str, output_format: str = "mp3", params: dict | None = None
+    ) -> SynthesisResult:
         cfg = self._cfg()
         if not cfg.get("openai_api_key"):
             raise RuntimeError("OPENAI_API_KEY missing")

@@ -26,7 +26,7 @@ def _refresh_catalog_safe() -> None:
     db = SessionLocal()
     try:
         refresh_catalog(db)
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         logger.warning("catalog_refresh_background_failed error=%s", exc)
     finally:
         db.close()
@@ -36,7 +36,7 @@ def _reap_stale_jobs_safe() -> None:
     db = SessionLocal()
     try:
         reap_stale_jobs(db, settings.job_max_runtime_seconds)
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         logger.warning("stale_job_reaper_failed error=%s", exc)
     finally:
         db.close()
@@ -50,7 +50,7 @@ async def _run_periodic(coro_func, interval_seconds: int, task_name: str) -> Non
         except asyncio.CancelledError:
             logger.info("periodic_task_cancelled task=%s", task_name)
             raise
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             logger.warning("periodic_task_error task=%s error=%s", task_name, exc)
 
 
@@ -66,9 +66,7 @@ async def lifespan(_app: FastAPI):
     background_tasks: list[asyncio.Task] = []
 
     if settings.voice_catalog_refresh_on_start:
-        background_tasks.append(
-            asyncio.create_task(asyncio.to_thread(_refresh_catalog_safe), name="catalog-refresh")
-        )
+        background_tasks.append(asyncio.create_task(asyncio.to_thread(_refresh_catalog_safe), name="catalog-refresh"))
 
     if settings.job_reaper_enabled:
         background_tasks.append(
@@ -80,7 +78,10 @@ async def lifespan(_app: FastAPI):
 
     logger.info(
         "startup_complete app=%s env=%s version=%s allowed_origins=%s",
-        settings.app_name, settings.app_env, settings.app_version, settings.app_allowed_origins,
+        settings.app_name,
+        settings.app_env,
+        settings.app_version,
+        settings.app_allowed_origins,
     )
 
     try:
@@ -91,7 +92,7 @@ async def lifespan(_app: FastAPI):
         for task in background_tasks:
             try:
                 await task
-            except (asyncio.CancelledError, Exception):  # noqa: BLE001
+            except (asyncio.CancelledError, Exception):
                 pass
 
 

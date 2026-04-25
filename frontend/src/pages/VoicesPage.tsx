@@ -21,7 +21,11 @@ export const VoicesPage = memo(function VoicesPage({
   const [isPickerOpen, setIsPickerOpen] = useState(false);
 
   const providerGroups = useMemo(
-    () => providers.map((provider) => ({ provider, count: voices.filter((voice) => voice.provider_key === provider.key).length })),
+    () =>
+      providers.map((provider) => ({
+        provider,
+        count: voices.filter((voice) => voice.provider_key === provider.key).length,
+      })),
     [providers, voices],
   );
 
@@ -31,11 +35,24 @@ export const VoicesPage = memo(function VoicesPage({
         <Panel
           title={t("voicesPage.title")}
           description={t("voicesPage.description")}
-          actions={<button type="button" className="ghost-button compact-button" onClick={() => setIsPickerOpen(true)}>{t("voicesPage.openPicker")}</button>}
+          actions={
+            <button
+              type="button"
+              className="ghost-button compact-button"
+              onClick={() => setIsPickerOpen(true)}
+            >
+              {t("voicesPage.openPicker")}
+            </button>
+          }
         >
           <div className="provider-stack-grid provider-stack-grid-wide">
             {providerGroups.map(({ provider, count }) => (
-              <button key={provider.key} type="button" className="provider-stack-card provider-stack-card-button" onClick={() => setIsPickerOpen(true)}>
+              <button
+                key={provider.key}
+                type="button"
+                className="provider-stack-card provider-stack-card-button"
+                onClick={() => setIsPickerOpen(true)}
+              >
                 <div className="provider-stack-head">
                   <div>
                     <strong>{provider.label}</strong>
@@ -44,9 +61,13 @@ export const VoicesPage = memo(function VoicesPage({
                   <span className={`tiny-badge tiny-badge-${provider.category}`}>{count}</span>
                 </div>
                 <div className="chip-row">
-                  {capabilityBadges(provider.capabilities).slice(0, 4).map((item) => (
-                    <span className="chip" key={item}>{t(`common.${item}`)}</span>
-                  ))}
+                  {capabilityBadges(provider.capabilities)
+                    .slice(0, 4)
+                    .map((item) => (
+                      <span className="chip" key={item}>
+                        {t(`common.${item}`)}
+                      </span>
+                    ))}
                 </div>
               </button>
             ))}
@@ -61,10 +82,15 @@ export const VoicesPage = memo(function VoicesPage({
                   <VoiceAvatar voice={selectedVoice} size="lg" />
                   <div>
                     <h3>{selectedVoice.display_name}</h3>
-                    <p>{selectedVoice.provider_label} · {selectedVoice.language ?? t("common.unknown")} · {selectedVoice.locale ?? "—"}</p>
+                    <p>
+                      {selectedVoice.provider_label} · {selectedVoice.language ?? t("common.unknown")} ·{" "}
+                      {selectedVoice.locale ?? "—"}
+                    </p>
                   </div>
                 </div>
-                <span className={`tiny-badge tiny-badge-${selectedVoice.provider_category}`}>{selectedVoice.provider_category}</span>
+                <span className={`tiny-badge tiny-badge-${selectedVoice.provider_category}`}>
+                  {selectedVoice.provider_category}
+                </span>
               </div>
               <p className="muted-copy">{selectedVoice.description ?? t("common.noDescription")}</p>
               <div className="detail-pills">
@@ -73,10 +99,22 @@ export const VoicesPage = memo(function VoicesPage({
                 <span>{formatLocaleLabel(selectedVoice.locale ?? selectedVoice.language, locale)}</span>
               </div>
               <div className="chip-row">
-                {capabilityBadges(selectedVoice.capabilities).map((item) => <span className="chip" key={item}>{t(`common.${item}`)}</span>)}
-                {selectedVoice.styles.map((style) => <span className="chip" key={style}>{style}</span>)}
+                {capabilityBadges(selectedVoice.capabilities).map((item) => (
+                  <span className="chip" key={item}>
+                    {t(`common.${item}`)}
+                  </span>
+                ))}
+                {selectedVoice.styles.map((style) => (
+                  <span className="chip" key={style}>
+                    {style}
+                  </span>
+                ))}
               </div>
-              {selectedVoice.preview_url ? <audio className="audio-preview" controls src={selectedVoice.preview_url} /> : <p className="muted-copy">{t("voicePicker.noPreviewSupport")}</p>}
+              {selectedVoice.preview_url ? (
+                <audio className="audio-preview" controls src={selectedVoice.preview_url} />
+              ) : (
+                <p className="muted-copy">{t("voicePicker.noPreviewSupport")}</p>
+              )}
               <pre className="code-block">{JSON.stringify(selectedVoice.provider_metadata, null, 2)}</pre>
             </div>
           ) : (

@@ -2,19 +2,24 @@ import { memo, useMemo, useState } from "react";
 import type { Job } from "../types";
 import { Panel } from "../components/Panel";
 import { JobTable } from "../components/JobTable";
+import { InlineAudioPlayer } from "../components/InlineAudioPlayer";
 import { LiveEventList } from "../components/LiveEventList";
 import { useI18n } from "../i18n";
 
-const STATUS_TABS = ["all", "queued", "running", "succeeded", "failed"] as const;
+const STATUS_TABS = ["all", "queued", "running", "succeeded", "failed", "canceled"] as const;
 
 export const JobsPage = memo(function JobsPage({
   jobs,
   selectedJob,
   onSelectJob,
+  onCancelJob,
+  onRetryJob,
 }: {
   jobs: Job[];
   selectedJob: Job | null;
   onSelectJob: (job: Job) => void;
+  onCancelJob?: (jobId: string) => void;
+  onRetryJob?: (jobId: string) => void;
 }) {
   const { t } = useI18n();
   const [statusFilter, setStatusFilter] = useState<(typeof STATUS_TABS)[number]>("all");
@@ -30,6 +35,7 @@ export const JobsPage = memo(function JobsPage({
     running: t("jobsPage.running"),
     succeeded: t("jobsPage.succeeded"),
     failed: t("jobsPage.failed"),
+    canceled: t("jobsPage.canceled"),
   };
 
   return (
@@ -52,7 +58,7 @@ export const JobsPage = memo(function JobsPage({
           </div>
         }
       >
-        <JobTable jobs={visibleJobs} onSelect={onSelectJob} />
+        <JobTable jobs={visibleJobs} onSelect={onSelectJob} onCancel={onCancelJob} onRetry={onRetryJob} />
       </Panel>
 
       <Panel title={t("jobsPage.detailTitle")} description={t("jobsPage.detailDescription")}>
@@ -65,6 +71,12 @@ export const JobsPage = memo(function JobsPage({
               <span>{selectedJob.output_format}</span>
             </div>
             <p className="muted-copy">{selectedJob.source_text}</p>
+            {selectedJob.artifact ? (
+              <InlineAudioPlayer
+                downloadUrl={selectedJob.artifact.download_url}
+                mimeType={selectedJob.artifact.mime_type}
+              />
+            ) : null}
             <pre className="code-block">{JSON.stringify(selectedJob.normalized_params, null, 2)}</pre>
             <LiveEventList events={selectedJob.events} compact />
           </div>

@@ -13,7 +13,14 @@ import { VoicePickerDialog } from "../components/VoicePickerDialog";
 import { VoiceParameterPanel } from "../components/VoiceParameterPanel";
 import { useI18n, type Locale } from "../i18n";
 import { formatJobDuration } from "../lib/format";
-import type { Project, ProjectMergeResponse, ProjectScriptRow, ProviderParamField, ProviderSummary, VoiceCatalogEntry } from "../types";
+import type {
+  Project,
+  ProjectMergeResponse,
+  ProjectScriptRow,
+  ProviderParamField,
+  ProviderSummary,
+  VoiceCatalogEntry,
+} from "../types";
 
 type DraftRow = {
   local_id: string;
@@ -39,7 +46,8 @@ type PickerTarget = { mode: "row"; localId: string } | { mode: "bulk" } | null;
 const COPY: Record<Locale, Record<string, string>> = {
   en: {
     title: "Script line editor",
-    description: "Edit long scripts row-by-row, assign voices per line, generate only changed lines and merge completed audio into a master file.",
+    description:
+      "Edit long scripts row-by-row, assign voices per line, generate only changed lines and merge completed audio into a master file.",
     project: "Project",
     importTitle: "Import script",
     importDescription: "Paste text and split by non-empty lines. Save after editing before queueing.",
@@ -91,7 +99,8 @@ const COPY: Record<Locale, Record<string, string>> = {
   },
   vi: {
     title: "Editor từng dòng script",
-    description: "Sửa script dài theo từng dòng, gán voice riêng cho từng dòng, chỉ render lại dòng cần thiết và nối audio đã xong thành file master.",
+    description:
+      "Sửa script dài theo từng dòng, gán voice riêng cho từng dòng, chỉ render lại dòng cần thiết và nối audio đã xong thành file master.",
     project: "Project",
     importTitle: "Import script",
     importDescription: "Dán text và tách theo các dòng không rỗng. Sau khi sửa nên lưu trước khi queue.",
@@ -204,7 +213,12 @@ function buildVoiceKey(providerKey?: string | null, voiceId?: string | null) {
 }
 
 function defaultParamsForProvider(providerKey: string, schemas: Record<string, ProviderParamField[]>) {
-  return Object.fromEntries((schemas[providerKey] ?? []).map((field) => [field.key, field.default ?? (field.kind === "boolean" ? false : "")]));
+  return Object.fromEntries(
+    (schemas[providerKey] ?? []).map((field) => [
+      field.key,
+      field.default ?? (field.kind === "boolean" ? false : ""),
+    ]),
+  );
 }
 
 export const ScriptEditorPage = memo(function ScriptEditorPage({
@@ -228,9 +242,12 @@ export const ScriptEditorPage = memo(function ScriptEditorPage({
 }) {
   const { locale } = useI18n();
   const copy = COPY[locale];
-  const [activeProjectKey, setActiveProjectKey] = useState(selectedProjectKey || projects[0]?.project_key || "default");
+  const [activeProjectKey, setActiveProjectKey] = useState(
+    selectedProjectKey || projects[0]?.project_key || "default",
+  );
   const [rows, setRows] = useState<DraftRow[]>([]);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [draggedRowId, setDraggedRowId] = useState<string | null>(null);
   const [importText, setImportText] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -242,7 +259,10 @@ export const ScriptEditorPage = memo(function ScriptEditorPage({
   const [mergeSilenceMs, setMergeSilenceMs] = useState(150);
   const [masterArtifactUrl, setMasterArtifactUrl] = useState<string | null>(null);
 
-  const project = useMemo(() => projects.find((item) => item.project_key === activeProjectKey) ?? null, [activeProjectKey, projects]);
+  const project = useMemo(
+    () => projects.find((item) => item.project_key === activeProjectKey) ?? null,
+    [activeProjectKey, projects],
+  );
 
   useEffect(() => {
     if (!project) return;
@@ -250,33 +270,41 @@ export const ScriptEditorPage = memo(function ScriptEditorPage({
     setMergeFormat(String(projectSettings.merge_output_format ?? mergeDefaults.merge_output_format ?? "wav"));
     setMergeSilenceMs(Number(projectSettings.merge_silence_ms ?? mergeDefaults.merge_silence_ms ?? 150));
   }, [project?.project_key, mergeDefaults.merge_output_format, mergeDefaults.merge_silence_ms]);
-  const voiceMap = useMemo(() => new Map(voices.map((voice) => [buildVoiceKey(voice.provider_key, voice.provider_voice_id), voice])), [voices]);
+  const voiceMap = useMemo(
+    () => new Map(voices.map((voice) => [buildVoiceKey(voice.provider_key, voice.provider_voice_id), voice])),
+    [voices],
+  );
   const selectedVoiceForPicker = useMemo(() => {
     if (!pickerTarget || pickerTarget.mode === "bulk") return null;
     const row = rows.find((item) => item.local_id === pickerTarget.localId);
-    return row ? voiceMap.get(buildVoiceKey(row.provider_key, row.provider_voice_id)) ?? null : null;
+    return row ? (voiceMap.get(buildVoiceKey(row.provider_key, row.provider_voice_id)) ?? null) : null;
   }, [pickerTarget, rows, voiceMap]);
 
   const stats = useMemo(() => {
     const active = rows.filter((row) => row.is_enabled).length;
-    const completed = rows.filter((row) => row.last_artifact_download_url || row.status === "succeeded").length;
+    const completed = rows.filter(
+      (row) => row.last_artifact_download_url || row.status === "succeeded",
+    ).length;
     return { total: rows.length, active, completed, selected: selectedIds.size };
   }, [rows, selectedIds.size]);
 
-  const loadRows = useCallback(async (projectKey: string, silent = false) => {
-    try {
-      if (!silent) setIsLoading(true);
-      setError(null);
-      const items = await fetchProjectRows(projectKey);
-      setRows(items.map(rowFromApi));
-      setSelectedIds(new Set());
-      setIsDirty(false);
-    } catch {
-      setError(copy.loadError);
-    } finally {
-      if (!silent) setIsLoading(false);
-    }
-  }, [copy.loadError]);
+  const loadRows = useCallback(
+    async (projectKey: string, silent = false) => {
+      try {
+        if (!silent) setIsLoading(true);
+        setError(null);
+        const items = await fetchProjectRows(projectKey);
+        setRows(items.map(rowFromApi));
+        setSelectedIds(new Set());
+        setIsDirty(false);
+      } catch {
+        setError(copy.loadError);
+      } finally {
+        if (!silent) setIsLoading(false);
+      }
+    },
+    [copy.loadError],
+  );
 
   useEffect(() => {
     if (!activeProjectKey) return;
@@ -294,23 +322,39 @@ export const ScriptEditorPage = memo(function ScriptEditorPage({
     setMessage(null);
   }, []);
 
-  const updateRow = useCallback((localId: string, patch: Partial<DraftRow>) => {
-    updateRows((current) => current.map((row) => (row.local_id === localId ? { ...row, ...patch } : row)));
-  }, [updateRows]);
+  const updateRow = useCallback(
+    (localId: string, patch: Partial<DraftRow>) => {
+      updateRows((current) => current.map((row) => (row.local_id === localId ? { ...row, ...patch } : row)));
+    },
+    [updateRows],
+  );
 
-  const updateRowParam = useCallback((localId: string, key: string, value: string | number | boolean) => {
-    updateRows((current) => current.map((row) => (row.local_id === localId ? { ...row, params: { ...(row.params ?? {}), [key]: value } } : row)));
-  }, [updateRows]);
+  const updateRowParam = useCallback(
+    (localId: string, key: string, value: string | number | boolean) => {
+      updateRows((current) =>
+        current.map((row) =>
+          row.local_id === localId ? { ...row, params: { ...(row.params ?? {}), [key]: value } } : row,
+        ),
+      );
+    },
+    [updateRows],
+  );
 
   const saveRows = useCallback(async () => {
     try {
       setIsSaving(true);
       setError(null);
-      const currentSelectedIndexes = new Set(rows.filter((row) => selectedIds.has(row.local_id)).map((row) => row.row_index));
+      const currentSelectedIndexes = new Set(
+        rows.filter((row) => selectedIds.has(row.local_id)).map((row) => row.row_index),
+      );
       const saved = await replaceProjectRows(activeProjectKey, payloadRows(rows));
       const nextRows = saved.map(rowFromApi);
       setRows(nextRows);
-      setSelectedIds(new Set(nextRows.filter((row) => currentSelectedIndexes.has(row.row_index)).map((row) => row.local_id)));
+      setSelectedIds(
+        new Set(
+          nextRows.filter((row) => currentSelectedIndexes.has(row.row_index)).map((row) => row.local_id),
+        ),
+      );
       setIsDirty(false);
       setMessage(copy.saved);
       return nextRows;
@@ -363,17 +407,36 @@ export const ScriptEditorPage = memo(function ScriptEditorPage({
     });
   }, [selectedIds, updateRows]);
 
-  const moveRow = useCallback((localId: string, delta: number) => {
-    updateRows((current) => {
-      const index = current.findIndex((row) => row.local_id === localId);
-      const target = index + delta;
-      if (index < 0 || target < 0 || target >= current.length) return current;
-      const next = [...current];
-      const [row] = next.splice(index, 1);
-      next.splice(target, 0, row);
-      return next;
-    });
-  }, [updateRows]);
+  const moveRow = useCallback(
+    (localId: string, delta: number) => {
+      updateRows((current) => {
+        const index = current.findIndex((row) => row.local_id === localId);
+        const target = index + delta;
+        if (index < 0 || target < 0 || target >= current.length) return current;
+        const next = [...current];
+        const [row] = next.splice(index, 1);
+        next.splice(target, 0, row);
+        return next;
+      });
+    },
+    [updateRows],
+  );
+
+  const moveRowToIndex = useCallback(
+    (localId: string, targetIndex: number) => {
+      updateRows((current) => {
+        const fromIndex = current.findIndex((row) => row.local_id === localId);
+        if (fromIndex < 0) return current;
+        const clampedTarget = Math.max(0, Math.min(targetIndex, current.length - 1));
+        if (clampedTarget === fromIndex) return current;
+        const next = [...current];
+        const [row] = next.splice(fromIndex, 1);
+        next.splice(clampedTarget, 0, row);
+        return next;
+      });
+    },
+    [updateRows],
+  );
 
   const toggleSelection = useCallback((localId: string) => {
     setSelectedIds((current) => {
@@ -384,34 +447,58 @@ export const ScriptEditorPage = memo(function ScriptEditorPage({
     });
   }, []);
 
-  const queueRows = useCallback(async (mode: "selected" | "enabled", mergeOutputs = false) => {
-    try {
-      setError(null);
-      const savedRows = isDirty ? await saveRows() : rows;
-      if (!savedRows) return;
-      let row_ids: string[] | undefined;
-      if (mode === "selected") {
-        row_ids = savedRows.filter((row) => selectedIds.has(row.local_id)).map((row) => row.id).filter(Boolean) as string[];
-        if (row_ids.length === 0) return;
+  const queueRows = useCallback(
+    async (mode: "selected" | "enabled", mergeOutputs = false) => {
+      try {
+        setError(null);
+        const savedRows = isDirty ? await saveRows() : rows;
+        if (!savedRows) return;
+        let row_ids: string[] | undefined;
+        if (mode === "selected") {
+          row_ids = savedRows
+            .filter((row) => selectedIds.has(row.local_id))
+            .map((row) => row.id)
+            .filter(Boolean) as string[];
+          if (row_ids.length === 0) return;
+        }
+        await queueProjectRows(activeProjectKey, {
+          row_ids,
+          merge_outputs: mergeOutputs,
+          merge_output_format: mergeFormat,
+          merge_silence_ms: mergeSilenceMs,
+        });
+        await loadRows(activeProjectKey, true);
+        setMessage(
+          mergeOutputs ? copy.queueAndMerge : mode === "selected" ? copy.queueSelected : copy.queueEnabled,
+        );
+      } catch {
+        setError(copy.queueError);
       }
-      await queueProjectRows(activeProjectKey, {
-        row_ids,
-        merge_outputs: mergeOutputs,
-        merge_output_format: mergeFormat,
-        merge_silence_ms: mergeSilenceMs,
-      });
-      await loadRows(activeProjectKey, true);
-      setMessage(mergeOutputs ? copy.queueAndMerge : mode === "selected" ? copy.queueSelected : copy.queueEnabled);
-    } catch {
-      setError(copy.queueError);
-    }
-  }, [activeProjectKey, copy.queueAndMerge, copy.queueEnabled, copy.queueError, copy.queueSelected, isDirty, loadRows, mergeFormat, mergeSilenceMs, rows, saveRows, selectedIds]);
+    },
+    [
+      activeProjectKey,
+      copy.queueAndMerge,
+      copy.queueEnabled,
+      copy.queueError,
+      copy.queueSelected,
+      isDirty,
+      loadRows,
+      mergeFormat,
+      mergeSilenceMs,
+      rows,
+      saveRows,
+      selectedIds,
+    ],
+  );
 
   const mergeRows = useCallback(async () => {
     try {
       setError(null);
       const result: ProjectMergeResponse = await mergeProjectRows(activeProjectKey, {
-        row_ids: selectedIds.size > 0 ? rows.filter((row) => selectedIds.has(row.local_id) && row.id).map((row) => row.id as string) : undefined,
+        row_ids:
+          selectedIds.size > 0
+            ? rows.filter((row) => selectedIds.has(row.local_id) && row.id).map((row) => row.id as string)
+            : undefined,
         merge_output_format: mergeFormat,
         merge_silence_ms: mergeSilenceMs,
       });
@@ -420,30 +507,54 @@ export const ScriptEditorPage = memo(function ScriptEditorPage({
     } catch {
       setError(copy.mergeError);
     }
-  }, [activeProjectKey, copy.masterReady, copy.mergeError, copy.rows, mergeFormat, mergeSilenceMs, rows, selectedIds]);
+  }, [
+    activeProjectKey,
+    copy.masterReady,
+    copy.mergeError,
+    copy.rows,
+    mergeFormat,
+    mergeSilenceMs,
+    rows,
+    selectedIds,
+  ]);
 
-  const handleVoiceSelected = useCallback((voice: VoiceCatalogEntry) => {
-    if (!pickerTarget) return;
-    const defaults = defaultParamsForProvider(voice.provider_key, voiceParameterSchemas);
-    if (pickerTarget.mode === "row") {
-      updateRow(pickerTarget.localId, {
-        provider_key: voice.provider_key,
-        provider_voice_id: voice.provider_voice_id,
-        params: defaults,
-      });
-    } else {
-      updateRows((current) => current.map((row) => {
-        const target = selectedIds.size > 0 ? selectedIds.has(row.local_id) : row.is_enabled;
-        return target ? { ...row, provider_key: voice.provider_key, provider_voice_id: voice.provider_voice_id, params: defaults } : row;
-      }));
-    }
-  }, [pickerTarget, selectedIds, updateRow, updateRows, voiceParameterSchemas]);
+  const handleVoiceSelected = useCallback(
+    (voice: VoiceCatalogEntry) => {
+      if (!pickerTarget) return;
+      const defaults = defaultParamsForProvider(voice.provider_key, voiceParameterSchemas);
+      if (pickerTarget.mode === "row") {
+        updateRow(pickerTarget.localId, {
+          provider_key: voice.provider_key,
+          provider_voice_id: voice.provider_voice_id,
+          params: defaults,
+        });
+      } else {
+        updateRows((current) =>
+          current.map((row) => {
+            const target = selectedIds.size > 0 ? selectedIds.has(row.local_id) : row.is_enabled;
+            return target
+              ? {
+                  ...row,
+                  provider_key: voice.provider_key,
+                  provider_voice_id: voice.provider_voice_id,
+                  params: defaults,
+                }
+              : row;
+          }),
+        );
+      }
+    },
+    [pickerTarget, selectedIds, updateRow, updateRows, voiceParameterSchemas],
+  );
 
-  const onProjectChange = useCallback((projectKey: string) => {
-    setActiveProjectKey(projectKey);
-    onSelectProject(projectKey);
-    setMasterArtifactUrl(null);
-  }, [onSelectProject]);
+  const onProjectChange = useCallback(
+    (projectKey: string) => {
+      setActiveProjectKey(projectKey);
+      onSelectProject(projectKey);
+      setMasterArtifactUrl(null);
+    },
+    [onSelectProject],
+  );
 
   return (
     <>
@@ -454,7 +565,12 @@ export const ScriptEditorPage = memo(function ScriptEditorPage({
           actions={
             <div className="actions-row">
               {isDirty ? <span className="status-tag status-tag-queued">{copy.dirty}</span> : null}
-              <button type="button" className="ghost-button compact-button" onClick={() => void saveRows()} disabled={isSaving}>
+              <button
+                type="button"
+                className="ghost-button compact-button"
+                onClick={() => void saveRows()}
+                disabled={isSaving}
+              >
                 {isSaving ? copy.saving : copy.saveRows}
               </button>
             </div>
@@ -465,15 +581,29 @@ export const ScriptEditorPage = memo(function ScriptEditorPage({
               <label>{copy.project}</label>
               <select value={activeProjectKey} onChange={(event) => onProjectChange(event.target.value)}>
                 {projects.map((item) => (
-                  <option key={item.project_key} value={item.project_key}>{item.name}</option>
+                  <option key={item.project_key} value={item.project_key}>
+                    {item.name}
+                  </option>
                 ))}
               </select>
             </div>
             <div className="script-stats-grid">
-              <div><span>{copy.rows}</span><strong>{stats.total}</strong></div>
-              <div><span>{copy.activeRows}</span><strong>{stats.active}</strong></div>
-              <div><span>{copy.completedRows}</span><strong>{stats.completed}</strong></div>
-              <div><span>{copy.selectedRows}</span><strong>{stats.selected}</strong></div>
+              <div>
+                <span>{copy.rows}</span>
+                <strong>{stats.total}</strong>
+              </div>
+              <div>
+                <span>{copy.activeRows}</span>
+                <strong>{stats.active}</strong>
+              </div>
+              <div>
+                <span>{copy.completedRows}</span>
+                <strong>{stats.completed}</strong>
+              </div>
+              <div>
+                <span>{copy.selectedRows}</span>
+                <strong>{stats.selected}</strong>
+              </div>
             </div>
           </div>
 
@@ -481,18 +611,57 @@ export const ScriptEditorPage = memo(function ScriptEditorPage({
           {error ? <div className="inline-alert">{error}</div> : null}
 
           <div className="script-action-bar">
-            <button type="button" className="ghost-button compact-button" onClick={addRow}>{copy.addRow}</button>
-            <button type="button" className="ghost-button compact-button" onClick={() => setPickerTarget({ mode: "bulk" })}>{copy.bulkVoice}</button>
-            <button type="button" className="ghost-button compact-button" disabled={selectedIds.size === 0} onClick={duplicateSelected}>{copy.duplicateSelected}</button>
-            <button type="button" className="ghost-button compact-button danger-button" disabled={selectedIds.size === 0} onClick={deleteSelected}>{copy.deleteSelected}</button>
-            <button type="button" className="ghost-button compact-button" onClick={() => void queueRows("selected")} disabled={selectedIds.size === 0}>{copy.queueSelected}</button>
-            <button type="button" className="primary-button compact-primary" onClick={() => void queueRows("enabled")}>{copy.queueEnabled}</button>
+            <button type="button" className="ghost-button compact-button" onClick={addRow}>
+              {copy.addRow}
+            </button>
+            <button
+              type="button"
+              className="ghost-button compact-button"
+              onClick={() => setPickerTarget({ mode: "bulk" })}
+            >
+              {copy.bulkVoice}
+            </button>
+            <button
+              type="button"
+              className="ghost-button compact-button"
+              disabled={selectedIds.size === 0}
+              onClick={duplicateSelected}
+            >
+              {copy.duplicateSelected}
+            </button>
+            <button
+              type="button"
+              className="ghost-button compact-button danger-button"
+              disabled={selectedIds.size === 0}
+              onClick={deleteSelected}
+            >
+              {copy.deleteSelected}
+            </button>
+            <button
+              type="button"
+              className="ghost-button compact-button"
+              onClick={() => void queueRows("selected")}
+              disabled={selectedIds.size === 0}
+            >
+              {copy.queueSelected}
+            </button>
+            <button
+              type="button"
+              className="primary-button compact-primary"
+              onClick={() => void queueRows("enabled")}
+            >
+              {copy.queueEnabled}
+            </button>
           </div>
           <p className="muted-copy compact-copy">{copy.applyVoiceHint}</p>
 
           <div className="script-table-wrap">
             {isLoading ? <p className="muted-copy">Loading…</p> : null}
-            {!isLoading && rows.length === 0 ? <div className="empty-state-box"><p className="muted-copy">{copy.noRows}</p></div> : null}
+            {!isLoading && rows.length === 0 ? (
+              <div className="empty-state-box">
+                <p className="muted-copy">{copy.noRows}</p>
+              </div>
+            ) : null}
             {rows.length > 0 ? (
               <table className="script-table">
                 <thead>
@@ -513,24 +682,78 @@ export const ScriptEditorPage = memo(function ScriptEditorPage({
                 <tbody>
                   {rows.map((row, index) => {
                     const voice = voiceMap.get(buildVoiceKey(row.provider_key, row.provider_voice_id));
-                    const artifactHref = row.last_artifact_download_url ? artifactUrl(row.last_artifact_download_url) : null;
+                    const artifactHref = row.last_artifact_download_url
+                      ? artifactUrl(row.last_artifact_download_url)
+                      : null;
                     return (
-                      <tr key={row.local_id} className={!row.is_enabled ? "script-row-disabled" : ""}>
+                      <tr
+                        key={row.local_id}
+                        className={`${!row.is_enabled ? "script-row-disabled" : ""} ${
+                          draggedRowId === row.local_id ? "script-row-dragging" : ""
+                        }`}
+                        draggable
+                        onDragStart={(event) => {
+                          setDraggedRowId(row.local_id);
+                          event.dataTransfer.effectAllowed = "move";
+                          event.dataTransfer.setData("text/plain", row.local_id);
+                        }}
+                        onDragOver={(event) => {
+                          if (draggedRowId && draggedRowId !== row.local_id) {
+                            event.preventDefault();
+                            event.dataTransfer.dropEffect = "move";
+                          }
+                        }}
+                        onDrop={(event) => {
+                          event.preventDefault();
+                          const sourceId = event.dataTransfer.getData("text/plain") || draggedRowId;
+                          if (sourceId && sourceId !== row.local_id) {
+                            moveRowToIndex(sourceId, index);
+                          }
+                          setDraggedRowId(null);
+                        }}
+                        onDragEnd={() => setDraggedRowId(null)}
+                      >
                         <td>
-                          <input type="checkbox" checked={selectedIds.has(row.local_id)} onChange={() => toggleSelection(row.local_id)} />
+                          <input
+                            type="checkbox"
+                            checked={selectedIds.has(row.local_id)}
+                            onChange={() => toggleSelection(row.local_id)}
+                          />
                         </td>
                         <td className="script-line-cell">
                           <strong>{index + 1}</strong>
                           <div className="reorder-buttons">
-                            <button type="button" className="icon-button" title={copy.reorderUp} onClick={() => moveRow(row.local_id, -1)}>↑</button>
-                            <button type="button" className="icon-button" title={copy.reorderDown} onClick={() => moveRow(row.local_id, 1)}>↓</button>
+                            <button
+                              type="button"
+                              className="icon-button"
+                              title={copy.reorderUp}
+                              onClick={() => moveRow(row.local_id, -1)}
+                            >
+                              ↑
+                            </button>
+                            <button
+                              type="button"
+                              className="icon-button"
+                              title={copy.reorderDown}
+                              onClick={() => moveRow(row.local_id, 1)}
+                            >
+                              ↓
+                            </button>
                           </div>
                         </td>
                         <td>
-                          <input value={row.title} onChange={(event) => updateRow(row.local_id, { title: event.target.value })} placeholder={`Line ${index + 1}`} />
+                          <input
+                            value={row.title}
+                            onChange={(event) => updateRow(row.local_id, { title: event.target.value })}
+                            placeholder={`Line ${index + 1}`}
+                          />
                         </td>
                         <td className="script-text-cell">
-                          <textarea value={row.source_text} rows={3} onChange={(event) => updateRow(row.local_id, { source_text: event.target.value })} />
+                          <textarea
+                            value={row.source_text}
+                            rows={3}
+                            onChange={(event) => updateRow(row.local_id, { source_text: event.target.value })}
+                          />
                           {row.error_message ? <p className="row-error">{row.error_message}</p> : null}
                         </td>
                         <td className="script-voice-cell">
@@ -543,9 +766,17 @@ export const ScriptEditorPage = memo(function ScriptEditorPage({
                               </div>
                             </div>
                           ) : (
-                            <span className="muted-copy">{row.provider_voice_id ? row.provider_voice_id : copy.noVoice}</span>
+                            <span className="muted-copy">
+                              {row.provider_voice_id ? row.provider_voice_id : copy.noVoice}
+                            </span>
                           )}
-                          <button type="button" className="ghost-button compact-button" onClick={() => setPickerTarget({ mode: "row", localId: row.local_id })}>{copy.chooseVoice}</button>
+                          <button
+                            type="button"
+                            className="ghost-button compact-button"
+                            onClick={() => setPickerTarget({ mode: "row", localId: row.local_id })}
+                          >
+                            {copy.chooseVoice}
+                          </button>
                           <details className="row-param-details">
                             <summary>Voice settings</summary>
                             <VoiceParameterPanel
@@ -558,32 +789,63 @@ export const ScriptEditorPage = memo(function ScriptEditorPage({
                           </details>
                         </td>
                         <td>
-                          <select value={row.output_format} onChange={(event) => updateRow(row.local_id, { output_format: event.target.value })}>
-                            <option value="">{project?.default_output_format ? `${copy.inherit} (${project.default_output_format})` : copy.inherit}</option>
+                          <select
+                            value={row.output_format}
+                            onChange={(event) =>
+                              updateRow(row.local_id, { output_format: event.target.value })
+                            }
+                          >
+                            <option value="">
+                              {project?.default_output_format
+                                ? `${copy.inherit} (${project.default_output_format})`
+                                : copy.inherit}
+                            </option>
                             <option value="mp3">mp3</option>
                             <option value="wav">wav</option>
                           </select>
                         </td>
                         <td>
-                          <input type="checkbox" checked={row.is_enabled} onChange={(event) => updateRow(row.local_id, { is_enabled: event.target.checked })} />
+                          <input
+                            type="checkbox"
+                            checked={row.is_enabled}
+                            onChange={(event) =>
+                              updateRow(row.local_id, { is_enabled: event.target.checked })
+                            }
+                          />
                         </td>
                         <td>
-                          <input type="checkbox" checked={row.join_to_master} onChange={(event) => updateRow(row.local_id, { join_to_master: event.target.checked })} />
+                          <input
+                            type="checkbox"
+                            checked={row.join_to_master}
+                            onChange={(event) =>
+                              updateRow(row.local_id, { join_to_master: event.target.checked })
+                            }
+                          />
                         </td>
                         <td>
                           <StatusBadge value={row.status} />
-                          {row.duration_seconds != null ? <small className="muted-copy block-copy">{formatJobDuration(row.duration_seconds)}</small> : null}
+                          {row.duration_seconds != null ? (
+                            <small className="muted-copy block-copy">
+                              {formatJobDuration(row.duration_seconds)}
+                            </small>
+                          ) : null}
                         </td>
                         <td>
                           {artifactHref ? (
                             <div className="script-output-stack">
                               <audio controls src={artifactHref} />
-                              <a className="primary-link" href={artifactHref} download>{copy.download}</a>
+                              <a className="primary-link" href={artifactHref} download>
+                                {copy.download}
+                              </a>
                             </div>
-                          ) : <span className="muted-copy">{copy.previewUnavailable}</span>}
+                          ) : (
+                            <span className="muted-copy">{copy.previewUnavailable}</span>
+                          )}
                         </td>
                         <td>
-                          {!row.provider_key || !row.provider_voice_id ? <span className="status-tag status-tag-failed">{copy.missingVoice}</span> : null}
+                          {!row.provider_key || !row.provider_voice_id ? (
+                            <span className="status-tag status-tag-failed">{copy.missingVoice}</span>
+                          ) : null}
                         </td>
                       </tr>
                     );
@@ -597,9 +859,16 @@ export const ScriptEditorPage = memo(function ScriptEditorPage({
         <aside className="script-side-stack">
           <Panel title={copy.importTitle} description={copy.importDescription}>
             <div className="form-field">
-              <textarea rows={8} value={importText} onChange={(event) => setImportText(event.target.value)} placeholder={copy.importPlaceholder} />
+              <textarea
+                rows={8}
+                value={importText}
+                onChange={(event) => setImportText(event.target.value)}
+                placeholder={copy.importPlaceholder}
+              />
             </div>
-            <button type="button" className="ghost-button" onClick={importRows} disabled={!importText.trim()}>{copy.splitLines}</button>
+            <button type="button" className="ghost-button" onClick={importRows} disabled={!importText.trim()}>
+              {copy.splitLines}
+            </button>
           </Panel>
 
           <Panel title={copy.mergeCompleted} description={`${copy.completedRows}: ${stats.completed}`}>
@@ -613,17 +882,26 @@ export const ScriptEditorPage = memo(function ScriptEditorPage({
               </div>
               <div className="form-field compact">
                 <label>{copy.silence}</label>
-                <input type="number" min={0} value={mergeSilenceMs} onChange={(event) => setMergeSilenceMs(Number(event.target.value))} />
+                <input
+                  type="number"
+                  min={0}
+                  value={mergeSilenceMs}
+                  onChange={(event) => setMergeSilenceMs(Number(event.target.value))}
+                />
               </div>
             </div>
             <div className="script-action-column">
-              <button type="button" className="primary-button" onClick={() => void mergeRows()}>{copy.mergeCompleted}</button>
+              <button type="button" className="primary-button" onClick={() => void mergeRows()}>
+                {copy.mergeCompleted}
+              </button>
             </div>
             {masterArtifactUrl ? (
               <div className="master-artifact-card">
                 <strong>{copy.masterReady}</strong>
                 <audio controls src={masterArtifactUrl} />
-                <a className="primary-link" href={masterArtifactUrl} download>{copy.download}</a>
+                <a className="primary-link" href={masterArtifactUrl} download>
+                  {copy.download}
+                </a>
               </div>
             ) : null}
           </Panel>

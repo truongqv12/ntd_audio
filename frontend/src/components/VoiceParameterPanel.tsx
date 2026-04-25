@@ -14,14 +14,16 @@ export const VoiceParameterPanel = memo(function VoiceParameterPanel({
   onChange: (key: string, value: string | number | boolean) => void;
   compact?: boolean;
 }) {
-  const fields = useMemo(() => (providerKey ? schemas[providerKey] ?? [] : []), [providerKey, schemas]);
+  const fields = useMemo(() => (providerKey ? (schemas[providerKey] ?? []) : []), [providerKey, schemas]);
 
   if (!providerKey) {
     return <p className="muted-copy compact-copy">Choose a voice to see engine-specific settings.</p>;
   }
 
   if (fields.length === 0) {
-    return <p className="muted-copy compact-copy">No adjustable parameters surfaced for this provider yet.</p>;
+    return (
+      <p className="muted-copy compact-copy">No adjustable parameters surfaced for this provider yet.</p>
+    );
   }
 
   return (
@@ -41,16 +43,28 @@ export const VoiceParameterPanel = memo(function VoiceParameterPanel({
                 onChange={(event) => onChange(field.key, event.target.value)}
               />
             ) : field.kind === "text" ? (
-              <input value={String(value ?? "")} onChange={(event) => onChange(field.key, event.target.value)} />
+              <input
+                value={String(value ?? "")}
+                onChange={(event) => onChange(field.key, event.target.value)}
+              />
             ) : field.kind === "boolean" ? (
               <label className="switch-row">
-                <input type="checkbox" checked={Boolean(value)} onChange={(event) => onChange(field.key, event.target.checked)} />
-                <span>{Boolean(value) ? "On" : "Off"}</span>
+                <input
+                  type="checkbox"
+                  checked={Boolean(value)}
+                  onChange={(event) => onChange(field.key, event.target.checked)}
+                />
+                <span>{value ? "On" : "Off"}</span>
               </label>
             ) : field.kind === "select" ? (
-              <select value={String(value ?? "")} onChange={(event) => onChange(field.key, event.target.value)}>
+              <select
+                value={String(value ?? "")}
+                onChange={(event) => onChange(field.key, event.target.value)}
+              >
                 {field.options.map((option) => (
-                  <option key={option.value} value={option.value}>{option.label}</option>
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
                 ))}
               </select>
             ) : (
@@ -66,7 +80,9 @@ export const VoiceParameterPanel = memo(function VoiceParameterPanel({
                 <strong>{Number(value ?? field.default ?? 0).toFixed((field.step ?? 1) < 1 ? 2 : 0)}</strong>
               </div>
             )}
-            {field.description ? <small className="muted-copy compact-copy">{field.description}</small> : null}
+            {field.description ? (
+              <small className="muted-copy compact-copy">{field.description}</small>
+            ) : null}
           </label>
         );
       })}

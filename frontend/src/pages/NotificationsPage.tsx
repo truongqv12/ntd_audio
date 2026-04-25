@@ -34,7 +34,14 @@ export const NotificationsPage = memo(function NotificationsPage({
     <Panel title={t("notificationsPage.title")} description={t("notificationsPage.description")}>
       <div className="tab-row">
         {(["all", "failed", "completed", "started"] as const).map((item) => (
-          <button key={item} type="button" className={`tab-pill ${severityFilter === item ? "tab-pill-active" : ""}`} onClick={() => setSeverityFilter(item)}>{labels[item]}</button>
+          <button
+            key={item}
+            type="button"
+            className={`tab-pill ${severityFilter === item ? "tab-pill-active" : ""}`}
+            onClick={() => setSeverityFilter(item)}
+          >
+            {labels[item]}
+          </button>
         ))}
       </div>
       <LiveEventList events={visibleEvents} />

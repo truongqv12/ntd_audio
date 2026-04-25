@@ -30,7 +30,9 @@ class AzureSpeechProvider:
         }
 
     def _voices_url(self) -> str:
-        return f"https://{self._cfg().get('azure_speech_region')}.tts.speech.microsoft.com/cognitiveservices/voices/list"
+        return (
+            f"https://{self._cfg().get('azure_speech_region')}.tts.speech.microsoft.com/cognitiveservices/voices/list"
+        )
 
     def _tts_url(self) -> str:
         return f"https://{self._cfg().get('azure_speech_region')}.tts.speech.microsoft.com/cognitiveservices/v1"
@@ -75,7 +77,11 @@ class AzureSpeechProvider:
                     locale=item.get("Locale"),
                     gender=item.get("Gender"),
                     voice_type="neural" if item.get("VoiceType") == "Neural" else item.get("VoiceType"),
-                    description=item.get("StyleList", ["Azure Speech voice"])[0] if item.get("StyleList") else "Azure Speech voice",
+                    description=(
+                        item.get("StyleList", ["Azure Speech voice"])[0]
+                        if item.get("StyleList")
+                        else "Azure Speech voice"
+                    ),
                     styles=item.get("StyleList") or [],
                     tags=["cloud", "azure", "multilingual"],
                     metadata={"status": item.get("Status"), "sampleRateHertz": item.get("SampleRateHertz")},
@@ -83,7 +89,9 @@ class AzureSpeechProvider:
             )
         return voices
 
-    def synthesize(self, *, text: str, voice_id: str, output_format: str = "mp3", params: dict | None = None) -> SynthesisResult:
+    def synthesize(
+        self, *, text: str, voice_id: str, output_format: str = "mp3", params: dict | None = None
+    ) -> SynthesisResult:
         cfg = self._cfg()
         if not self.is_configured():
             raise RuntimeError("Azure speech not configured")
@@ -106,11 +114,7 @@ class AzureSpeechProvider:
   <voice name='{voice_id}'>{body}</voice>
 </speak>
 """.strip()
-        output_header = (
-            "audio-24khz-48kbitrate-mono-mp3"
-            if output_format == "mp3"
-            else "riff-24khz-16bit-mono-pcm"
-        )
+        output_header = "audio-24khz-48kbitrate-mono-mp3" if output_format == "mp3" else "riff-24khz-16bit-mono-pcm"
         with httpx.Client(timeout=60.0) as client:
             response = client.post(
                 self._tts_url(),

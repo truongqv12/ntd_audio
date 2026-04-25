@@ -5,12 +5,19 @@ import { useI18n } from "../i18n";
 import { formatDateTime, formatJobDuration } from "../lib/format";
 import { StatusBadge } from "./StatusBadge";
 
+const CANCELABLE = new Set(["queued", "running"]);
+const RETRYABLE = new Set(["failed", "canceled"]);
+
 export const JobTable = memo(function JobTable({
   jobs,
   onSelect,
+  onCancel,
+  onRetry,
 }: {
   jobs: Job[];
   onSelect: (job: Job) => void;
+  onCancel?: (jobId: string) => void;
+  onRetry?: (jobId: string) => void;
 }) {
   const { t } = useI18n();
   return (
@@ -38,21 +45,62 @@ export const JobTable = memo(function JobTable({
               </td>
               <td>{job.project_name ?? job.project_key}</td>
               <td>{job.provider_key}</td>
-              <td><StatusBadge value={job.status} /></td>
+              <td>
+                <StatusBadge value={job.status} />
+              </td>
               <td>{formatDateTime(job.created_at)}</td>
               <td>{formatJobDuration(job.duration_seconds)}</td>
               <td>
                 <div className="actions-row" onClick={(event) => event.stopPropagation()}>
                   {job.artifact ? (
-                    <a className="icon-button" href={artifactUrl(job.artifact.download_url)} target="_blank" rel="noreferrer">▶</a>
+                    <a
+                      className="icon-button"
+                      href={artifactUrl(job.artifact.download_url)}
+                      target="_blank"
+                      rel="noreferrer"
+                      title={t("tables.play")}
+                    >
+                      ▶
+                    </a>
                   ) : (
-                    <span className="icon-button icon-button-disabled">▶</span>
+                    <span className="icon-button icon-button-disabled" title={t("tables.play")}>
+                      ▶
+                    </span>
                   )}
                   {job.artifact ? (
-                    <a className="icon-button" href={artifactUrl(job.artifact.download_url)} download>↓</a>
+                    <a
+                      className="icon-button"
+                      href={artifactUrl(job.artifact.download_url)}
+                      download
+                      title={t("tables.download")}
+                    >
+                      ↓
+                    </a>
                   ) : (
-                    <span className="icon-button icon-button-disabled">↓</span>
+                    <span className="icon-button icon-button-disabled" title={t("tables.download")}>
+                      ↓
+                    </span>
                   )}
+                  {onCancel && CANCELABLE.has(job.status) ? (
+                    <button
+                      type="button"
+                      className="icon-button"
+                      onClick={() => onCancel(job.id)}
+                      title={t("tables.cancel")}
+                    >
+                      ✕
+                    </button>
+                  ) : null}
+                  {onRetry && RETRYABLE.has(job.status) ? (
+                    <button
+                      type="button"
+                      className="icon-button"
+                      onClick={() => onRetry(job.id)}
+                      title={t("tables.retry")}
+                    >
+                      ↻
+                    </button>
+                  ) : null}
                 </div>
               </td>
             </tr>

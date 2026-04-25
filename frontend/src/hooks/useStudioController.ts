@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  cancelJob as cancelJobApi,
   createJob,
   createProject,
   fetchCatalog,
@@ -8,6 +9,7 @@ import {
   fetchSettingsOverview,
   fetchProviders,
   openEventStream,
+  retryJob as retryJobApi,
   updateProject,
 } from "../api";
 import type {
@@ -59,7 +61,9 @@ export function useStudioController() {
   const [liveEvents, setLiveEvents] = useState<JobEvent[]>([]);
   const [health, setHealth] = useState<HealthResponse | null>(null);
   const [settingsOverview, setSettingsOverview] = useState<SettingsOverview | null>(null);
-  const [voiceParameterSchemas, setVoiceParameterSchemas] = useState<Record<string, ProviderParamField[]>>({});
+  const [voiceParameterSchemas, setVoiceParameterSchemas] = useState<Record<string, ProviderParamField[]>>(
+    {},
+  );
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -68,7 +72,8 @@ export function useStudioController() {
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
   const [sourceText, setSourceText] = useState(DEFAULT_SOURCE_TEXT);
   const [outputFormat, setOutputFormat] = useState("mp3");
-  const [voiceParams, setVoiceParams] = useState<Record<string, string | number | boolean>>(DEFAULT_VOICE_PARAMS);
+  const [voiceParams, setVoiceParams] =
+    useState<Record<string, string | number | boolean>>(DEFAULT_VOICE_PARAMS);
   const [lastSeenEventAt, setLastSeenEventAt] = useState<string | null>(null);
   const bootstrapDoneRef = useRef(false);
 
@@ -91,7 +96,10 @@ export function useStudioController() {
       setVoiceParameterSchemas(settingsData.voice_parameter_schemas ?? {});
 
       setSelectedVoiceKey((current) => {
-        if (current && catalog.voices.some((voice) => `${voice.provider_key}:${voice.provider_voice_id}` === current)) {
+        if (
+          current &&
+          catalog.voices.some((voice) => `${voice.provider_key}:${voice.provider_voice_id}` === current)
+        ) {
           return current;
         }
         const firstVoice = catalog.voices[0];
@@ -143,7 +151,9 @@ export function useStudioController() {
 
   const selectedVoice = useMemo(() => {
     if (!selectedVoiceKey) return null;
-    return voices.find((voice) => `${voice.provider_key}:${voice.provider_voice_id}` === selectedVoiceKey) ?? null;
+    return (
+      voices.find((voice) => `${voice.provider_key}:${voice.provider_voice_id}` === selectedVoiceKey) ?? null
+    );
   }, [voices, selectedVoiceKey]);
 
   const selectedJob = useMemo(
@@ -246,7 +256,10 @@ export function useStudioController() {
       try {
         setErrorMessage(null);
         const created = await createProject(payload);
-        setProjects((current) => [created, ...current.filter((item) => item.project_key !== created.project_key)]);
+        setProjects((current) => [
+          created,
+          ...current.filter((item) => item.project_key !== created.project_key),
+        ]);
         setSelectedProjectKey(created.project_key);
         return created;
       } catch (error) {
@@ -271,20 +284,42 @@ export function useStudioController() {
     }
   }, []);
 
-  const updateProjectDefaults = useCallback(
-    async (projectKey: string, payload: Record<string, unknown>) => {
-      try {
-        setErrorMessage(null);
-        const next = await updateProject(projectKey, payload);
-        setProjects((current) => current.map((item) => (item.project_key === next.project_key ? next : item)));
-        return next;
-      } catch (error) {
-        setErrorMessage(error instanceof Error ? error.message : "Unable to update project");
-        return null;
-      }
-    },
-    [],
-  );
+  const cancelJobAction = useCallback(async (jobId: string) => {
+    try {
+      setErrorMessage(null);
+      const updated = await cancelJobApi(jobId);
+      setJobs((current) => current.map((item) => (item.id === updated.id ? updated : item)));
+      return updated;
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "Unable to cancel job");
+      return null;
+    }
+  }, []);
+
+  const retryJobAction = useCallback(async (jobId: string) => {
+    try {
+      setErrorMessage(null);
+      const newJob = await retryJobApi(jobId);
+      setJobs((current) => [newJob, ...current.filter((item) => item.id !== newJob.id)]);
+      setSelectedJobId(newJob.id);
+      return newJob;
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "Unable to retry job");
+      return null;
+    }
+  }, []);
+
+  const updateProjectDefaults = useCallback(async (projectKey: string, payload: Record<string, unknown>) => {
+    try {
+      setErrorMessage(null);
+      const next = await updateProject(projectKey, payload);
+      setProjects((current) => current.map((item) => (item.project_key === next.project_key ? next : item)));
+      return next;
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "Unable to update project");
+      return null;
+    }
+  }, []);
 
   return {
     providers,
@@ -318,6 +353,8 @@ export function useStudioController() {
     createWorkspaceProject,
     toggleArchiveProject,
     updateProjectDefaults,
+    cancelJob: cancelJobAction,
+    retryJob: retryJobAction,
     refreshCatalog: bootstrap,
   };
 }

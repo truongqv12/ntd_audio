@@ -2,7 +2,13 @@ import { memo } from "react";
 import type { VoiceCatalogEntry } from "../types";
 import { getVoiceAvatarUrl, getVoiceInitials } from "../lib/voice";
 
-export const VoiceAvatar = memo(function VoiceAvatar({ voice, size = "md" }: { voice: VoiceCatalogEntry; size?: "sm" | "md" | "lg" }) {
+export const VoiceAvatar = memo(function VoiceAvatar({
+  voice,
+  size = "md",
+}: {
+  voice: VoiceCatalogEntry;
+  size?: "sm" | "md" | "lg";
+}) {
   const url = getVoiceAvatarUrl(voice);
   const initials = getVoiceInitials(voice);
   return url ? (

@@ -3,8 +3,18 @@ from sqlalchemy.orm import Session
 
 from .db import get_db
 from .providers_params import get_all_parameter_schemas, get_parameter_schema
-from .schemas import ProviderCredentialResponse, ProviderCredentialUpdateRequest, ProviderParameterSchemasResponse, SettingsOverviewResponse
-from .services_app_settings import list_provider_credentials, settings_overview, update_merge_defaults, update_provider_credentials
+from .schemas import (
+    ProviderCredentialResponse,
+    ProviderCredentialUpdateRequest,
+    ProviderParameterSchemasResponse,
+    SettingsOverviewResponse,
+)
+from .services_app_settings import (
+    list_provider_credentials,
+    settings_overview,
+    update_merge_defaults,
+    update_provider_credentials,
+)
 
 router = APIRouter(prefix="/settings", tags=["settings"])
 
@@ -20,7 +30,9 @@ def get_provider_credentials(db: Session = Depends(get_db)) -> list[ProviderCred
 
 
 @router.put("/provider-credentials/{provider_key}", response_model=ProviderCredentialResponse)
-def put_provider_credentials(provider_key: str, payload: ProviderCredentialUpdateRequest, db: Session = Depends(get_db)) -> ProviderCredentialResponse:
+def put_provider_credentials(
+    provider_key: str, payload: ProviderCredentialUpdateRequest, db: Session = Depends(get_db)
+) -> ProviderCredentialResponse:
     try:
         return update_provider_credentials(db, provider_key, payload.fields)
     except KeyError as exc:

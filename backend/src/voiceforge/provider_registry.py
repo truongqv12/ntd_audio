@@ -1,10 +1,10 @@
 from .providers_azure_speech import AzureSpeechProvider
 from .providers_elevenlabs import ElevenLabsProvider
 from .providers_google_tts import GoogleCloudTTSProvider
-from .providers_piper import PiperProvider
 from .providers_kokoro import KokoroProvider
-from .providers_vieneu_tts import VieNeuTTSProvider
 from .providers_openai_tts import OpenAITTSProvider
+from .providers_piper import PiperProvider
+from .providers_vieneu_tts import VieNeuTTSProvider
 from .providers_voicevox import VoicevoxProvider
 
 PROVIDERS = {

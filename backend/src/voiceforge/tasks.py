@@ -1,7 +1,6 @@
-from . import worker  # noqa: F401
-
 import dramatiq
 
+from . import worker  # noqa: F401
 from .db import SessionLocal
 from .services_jobs import process_job
 

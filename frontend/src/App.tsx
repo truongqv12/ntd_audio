@@ -58,7 +58,15 @@ function App() {
           />
         );
       case "jobs":
-        return <JobsPage jobs={controller.jobs} selectedJob={controller.selectedJob} onSelectJob={controller.setSelectedJob} />;
+        return (
+          <JobsPage
+            jobs={controller.jobs}
+            selectedJob={controller.selectedJob}
+            onSelectJob={controller.setSelectedJob}
+            onCancelJob={controller.cancelJob}
+            onRetryJob={controller.retryJob}
+          />
+        );
       case "script":
         return (
           <ScriptEditorPage
@@ -95,7 +103,12 @@ function App() {
       case "library":
         return <LibraryPage jobs={controller.jobs} projects={controller.projects} />;
       case "notifications":
-        return <NotificationsPage liveEvents={controller.liveEvents} onMarkSeen={controller.markNotificationsSeen} />;
+        return (
+          <NotificationsPage
+            liveEvents={controller.liveEvents}
+            onMarkSeen={controller.markNotificationsSeen}
+          />
+        );
       case "providers":
         return <ProvidersPage providers={controller.providers} />;
       case "monitor":
@@ -103,7 +116,17 @@ function App() {
       case "voice-lab":
         return <VoiceLabPage providers={controller.providers} />;
       case "settings":
-        return <SettingsPage health={controller.health} currentProject={controller.selectedProject} projects={controller.projects} providers={controller.providers} settingsOverview={controller.settingsOverview} onUpdateProject={controller.updateProjectDefaults} onRefresh={controller.refreshCatalog} />;
+        return (
+          <SettingsPage
+            health={controller.health}
+            currentProject={controller.selectedProject}
+            projects={controller.projects}
+            providers={controller.providers}
+            settingsOverview={controller.settingsOverview}
+            onUpdateProject={controller.updateProjectDefaults}
+            onRefresh={controller.refreshCatalog}
+          />
+        );
       default:
         return null;
     }

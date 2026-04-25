@@ -26,7 +26,9 @@ class Project(Base):
     is_default: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     archived_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False
+    )
 
     jobs: Mapped[list["SynthesisJob"]] = relationship(back_populates="project")
     script_rows: Mapped[list["ProjectScriptRow"]] = relationship(back_populates="project", cascade="all, delete-orphan")
@@ -34,9 +36,7 @@ class Project(Base):
 
 class VoiceCatalogEntry(Base):
     __tablename__ = "voice_catalog_entries"
-    __table_args__ = (
-        UniqueConstraint("provider_key", "provider_voice_id", name="uq_voice_catalog_provider_voice"),
-    )
+    __table_args__ = (UniqueConstraint("provider_key", "provider_voice_id", name="uq_voice_catalog_provider_voice"),)
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
     provider_key: Mapped[str] = mapped_column(String(50), index=True)
@@ -71,7 +71,9 @@ class SynthesisJob(Base):
     provider_key: Mapped[str] = mapped_column(String(50), index=True)
     provider_voice_id: Mapped[str] = mapped_column(String(255), index=True)
     voice_catalog_entry_id: Mapped[str | None] = mapped_column(ForeignKey("voice_catalog_entries.id"), nullable=True)
-    project_script_row_id: Mapped[str | None] = mapped_column(ForeignKey("project_script_rows.id"), nullable=True, index=True)
+    project_script_row_id: Mapped[str | None] = mapped_column(
+        ForeignKey("project_script_rows.id"), nullable=True, index=True
+    )
     status: Mapped[str] = mapped_column(String(20), index=True, default="queued")
     source_text: Mapped[str] = mapped_column(Text())
     input_format: Mapped[str] = mapped_column(String(20), default="plain_text")
@@ -113,7 +115,9 @@ class ProjectScriptRow(Base):
     duration_seconds: Mapped[float | None] = mapped_column(Float, nullable=True)
     error_message: Mapped[str | None] = mapped_column(Text(), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False
+    )
 
     project: Mapped["Project"] = relationship(back_populates="script_rows")
     jobs: Mapped[list["SynthesisJob"]] = relationship(back_populates="script_row")
@@ -175,4 +179,6 @@ class AppSetting(Base):
     value_json: Mapped[dict] = mapped_column(JSON, default=dict, nullable=False)
     is_secret: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False
+    )

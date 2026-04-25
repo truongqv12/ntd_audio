@@ -73,7 +73,9 @@ class VieNeuTTSProvider:
             for row in rows
         ]
 
-    def synthesize(self, *, text: str, voice_id: str, output_format: str = "wav", params: dict | None = None) -> SynthesisResult:
+    def synthesize(
+        self, *, text: str, voice_id: str, output_format: str = "wav", params: dict | None = None
+    ) -> SynthesisResult:
         if not self.is_configured():
             raise RuntimeError("VIENEU_TTS_BASE_URL missing")
         with httpx.Client(timeout=max(self._timeout(), 240.0)) as client:
