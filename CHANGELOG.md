@@ -27,6 +27,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - i18n message catalogs split into `src/i18n/en.json` + `src/i18n/vi.json`; `i18n.tsx` only owns the provider/hook surface now.
   - Design tokens (`--vf-color-*`, `--vf-radius-*`, `--vf-space-*`) declared at the top of `styles.css`; new components consume them.
   - `<ErrorBoundary>` wraps the app at the root; `Skeleton` / `SkeletonBlock` components for loading states.
+- **Production readiness (Epic 4).**
+  - API mounted under `/v1` (canonical) in addition to the legacy un-versioned routes — clients can migrate at their own pace.
+  - `prometheus-client` integration: `/metrics` (Prometheus text format) gated by `METRICS_ENABLED`. HTTP request rate / latency, job state transitions, and in-flight gauge are tracked.
+  - In-process token-bucket rate limiter (`RATE_LIMIT_PER_MINUTE`, default 0=disabled). Per-client buckets keyed by API key when present, otherwise remote IP. Returns 429 with `Retry-After`.
+  - Pluggable artifact storage (`STORAGE_BACKEND=local|s3`). `S3ArtifactStorage` uses `boto3` (S3 / MinIO / R2). Local backend remains the default.
+  - `docker-compose.prod.yml` overlay: drops the docker socket from the api container, removes host port bindings for postgres/redis, adds restart policies + memory limits + structured log rotation, and replaces the dev frontend with the multi-stage nginx image.
+  - Frontend Dockerfile now ships an `nginx.conf` with SPA fallback (`try_files`), long-lived asset caching, gzip, and a `/healthz` endpoint for the load balancer.
+
+### Deferred
+- **JWT auth + workspace boundary (E4.5).** Multi-tenant isolation requires schema changes (users, workspaces, role grants) and is tracked separately. The current API-key gate (Epic 3) covers single-user / per-deployment auth.
 
 ### Changed
 - `docker-compose.yml` now serializes `migrate → api/worker` and exposes `APP_ALLOWED_ORIGINS` to the API container.

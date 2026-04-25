@@ -39,6 +39,19 @@ class Settings(BaseSettings):
     app_encryption_key: str = Field(default="", alias="APP_ENCRYPTION_KEY")
     event_stream_heartbeat_seconds: float = Field(default=15.0, alias="EVENT_STREAM_HEARTBEAT_SECONDS")
 
+    # Observability + abuse-protection knobs (Epic 4).
+    metrics_enabled: bool = Field(default=True, alias="METRICS_ENABLED")
+    rate_limit_per_minute: int = Field(default=0, alias="RATE_LIMIT_PER_MINUTE")  # 0 = disabled
+
+    # Storage backend (local filesystem or S3).
+    storage_backend: str = Field(default="local", alias="STORAGE_BACKEND")  # local|s3
+    s3_bucket: str = Field(default="", alias="S3_BUCKET")
+    s3_region: str = Field(default="", alias="S3_REGION")
+    s3_endpoint_url: str = Field(default="", alias="S3_ENDPOINT_URL")
+    s3_access_key_id: str = Field(default="", alias="S3_ACCESS_KEY_ID")
+    s3_secret_access_key: str = Field(default="", alias="S3_SECRET_ACCESS_KEY")
+    s3_prefix: str = Field(default="artifacts/", alias="S3_PREFIX")
+
     log_level: str = Field(default="INFO", alias="LOG_LEVEL")
     log_file_path: Path = Field(default=Path("/data/logs/voiceforge.log"), alias="LOG_FILE_PATH")
     log_max_bytes: int = Field(default=2_000_000, alias="LOG_MAX_BYTES")
