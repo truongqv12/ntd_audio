@@ -11,10 +11,14 @@ export const JobsPage = memo(function JobsPage({
   jobs,
   selectedJob,
   onSelectJob,
+  onCancelJob,
+  onRetryJob,
 }: {
   jobs: Job[];
   selectedJob: Job | null;
   onSelectJob: (job: Job) => void;
+  onCancelJob?: (jobId: string) => void;
+  onRetryJob?: (jobId: string) => void;
 }) {
   const { t } = useI18n();
   const [statusFilter, setStatusFilter] = useState<(typeof STATUS_TABS)[number]>("all");
@@ -52,7 +56,12 @@ export const JobsPage = memo(function JobsPage({
           </div>
         }
       >
-        <JobTable jobs={visibleJobs} onSelect={onSelectJob} />
+        <JobTable
+          jobs={visibleJobs}
+          onSelect={onSelectJob}
+          onCancel={onCancelJob}
+          onRetry={onRetryJob}
+        />
       </Panel>
 
       <Panel title={t("jobsPage.detailTitle")} description={t("jobsPage.detailDescription")}>

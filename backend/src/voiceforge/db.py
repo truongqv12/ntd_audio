@@ -3,6 +3,7 @@ from collections.abc import Generator
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
+from sqlalchemy.pool import StaticPool
 
 from .config import settings
 
@@ -13,7 +14,21 @@ class Base(DeclarativeBase):
     pass
 
 
-engine = create_engine(settings.database_url, future=True, pool_pre_ping=True)
+def _build_engine() -> object:
+    url = settings.database_url
+    # In-memory sqlite needs a single shared connection across threads/sessions
+    # so the schema lives long enough for TestClient + fixtures to share it.
+    if url.startswith("sqlite") and ":memory:" in url:
+        return create_engine(
+            url,
+            future=True,
+            connect_args={"check_same_thread": False},
+            poolclass=StaticPool,
+        )
+    return create_engine(url, future=True, pool_pre_ping=True)
+
+
+engine = _build_engine()
 SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False, expire_on_commit=False, class_=Session)
 
 

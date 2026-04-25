@@ -310,6 +310,10 @@ const messages: Record<Locale, TranslationTree> = {
       created: "Created",
       duration: "Duration",
       actions: "Actions",
+      play: "Play",
+      download: "Download",
+      cancel: "Cancel job",
+      retry: "Retry job",
     },
   },
   vi: {
@@ -603,6 +607,10 @@ const messages: Record<Locale, TranslationTree> = {
       created: "Tạo lúc",
       duration: "Thời lượng",
       actions: "Thao tác",
+      play: "Phát",
+      download: "Tải về",
+      cancel: "Huỷ job",
+      retry: "Chạy lại",
     },
   },
 };

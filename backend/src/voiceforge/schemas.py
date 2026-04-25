@@ -203,6 +203,9 @@ class JobResponse(BaseModel):
 
 class JobsResponse(BaseModel):
     items: list[JobResponse]
+    total: int = 0
+    limit: int = 50
+    offset: int = 0
 
 
 class LiveSnapshotResponse(BaseModel):
