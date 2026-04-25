@@ -1,0 +1,91 @@
+version: "3.9"
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: voiceforge
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+
+  voicevox:
+    image: voicevox/voicevox_engine:cpu-latest
+    ports:
+      - "50021:50021"
+
+  api:
+    build:
+      context: ./backend
+    env_file: .env
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg://postgres:postgres@postgres:5432/voiceforge}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+      ARTIFACT_ROOT: /data/artifacts
+      CACHE_ROOT: /data/cache
+      LOG_FILE_PATH: /data/logs/voiceforge-api.log
+      VOICEVOX_BASE_URL: ${VOICEVOX_BASE_URL:-http://voicevox:50021}
+      PIPER_BASE_URL: ${PIPER_BASE_URL:-}
+      KOKORO_BASE_URL: ${KOKORO_BASE_URL:-}
+      VIENEU_TTS_BASE_URL: ${VIENEU_TTS_BASE_URL:-}
+    volumes:
+      - artifacts-data:/data/artifacts
+      - cache-data:/data/cache
+      - logs-data:/data/logs
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    depends_on:
+      - postgres
+      - redis
+      - voicevox
+    ports:
+      - "8000:8000"
+
+  worker:
+    build:
+      context: ./backend
+    command: ["dramatiq", "src.voiceforge.tasks"]
+    working_dir: /app
+    env_file: .env
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg://postgres:postgres@postgres:5432/voiceforge}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+      ARTIFACT_ROOT: /data/artifacts
+      CACHE_ROOT: /data/cache
+      LOG_FILE_PATH: /data/logs/voiceforge-worker.log
+      VOICEVOX_BASE_URL: ${VOICEVOX_BASE_URL:-http://voicevox:50021}
+      PIPER_BASE_URL: ${PIPER_BASE_URL:-}
+      KOKORO_BASE_URL: ${KOKORO_BASE_URL:-}
+      VIENEU_TTS_BASE_URL: ${VIENEU_TTS_BASE_URL:-}
+      PYTHONPATH: /app
+    volumes:
+      - artifacts-data:/data/artifacts
+      - cache-data:/data/cache
+      - logs-data:/data/logs
+    depends_on:
+      - postgres
+      - redis
+      - voicevox
+
+  frontend:
+    build:
+      context: ./frontend
+    environment:
+      VITE_API_BASE: http://localhost:8000
+    depends_on:
+      - api
+    ports:
+      - "5173:5173"
+
+volumes:
+  postgres-data:
+  artifacts-data:
+  cache-data:
+  logs-data:

@@ -1,0 +1,18 @@
+services:
+  vieneu-runtime:
+    build:
+      context: ./engines/vieneu-runtime
+    ports:
+      - "8013:8013"
+
+  api:
+    environment:
+      VIENEU_TTS_BASE_URL: http://vieneu-runtime:8013
+    depends_on:
+      - vieneu-runtime
+
+  worker:
+    environment:
+      VIENEU_TTS_BASE_URL: http://vieneu-runtime:8013
+    depends_on:
+      - vieneu-runtime

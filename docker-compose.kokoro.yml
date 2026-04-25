@@ -1,0 +1,18 @@
+services:
+  kokoro-runtime:
+    build:
+      context: ./engines/kokoro-runtime
+    ports:
+      - "8012:8012"
+
+  api:
+    environment:
+      KOKORO_BASE_URL: http://kokoro-runtime:8012
+    depends_on:
+      - kokoro-runtime
+
+  worker:
+    environment:
+      KOKORO_BASE_URL: http://kokoro-runtime:8012
+    depends_on:
+      - kokoro-runtime

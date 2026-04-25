@@ -1,0 +1,27 @@
+services:
+  piper-runtime:
+    build:
+      context: ./engines/piper-runtime
+    environment:
+      PIPER_DATA_DIR: /data/piper
+      PIPER_VOICE_IDS: ${PIPER_VOICE_IDS:-vi_VN-vais1000-medium,en_US-lessac-medium,en_GB-alan-medium}
+      PIPER_DOWNLOAD_ON_START: ${PIPER_DOWNLOAD_ON_START:-true}
+    volumes:
+      - piper-data:/data/piper
+    ports:
+      - "8011:8011"
+
+  api:
+    environment:
+      PIPER_BASE_URL: http://piper-runtime:8011
+    depends_on:
+      - piper-runtime
+
+  worker:
+    environment:
+      PIPER_BASE_URL: http://piper-runtime:8011
+    depends_on:
+      - piper-runtime
+
+volumes:
+  piper-data:
