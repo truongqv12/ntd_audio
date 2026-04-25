@@ -14,9 +14,10 @@ from .api_router import build_api_router
 from .config import settings
 from .db import SessionLocal, init_db
 from .enums import JobStatus
+from .events_bus import subscribe_jobs_changed
 from .logging_setup import setup_logging
 from .models import SynthesisJob
-from .observability import record_http, render_metrics, seed_jobs_in_flight
+from .observability import record_http, record_job_event, render_metrics, seed_jobs_in_flight
 from .services_catalog import refresh_catalog
 from .services_jobs import reap_stale_jobs
 from .services_projects import ensure_project
@@ -44,6 +45,31 @@ def _reap_stale_jobs_safe() -> None:
         logger.warning("stale_job_reaper_failed error=%s", exc)
     finally:
         db.close()
+
+
+async def _metrics_subscriber() -> None:
+    """Single API-side consumer that translates Redis events into Prometheus metrics.
+
+    The API and the Dramatiq worker each own their own ``REGISTRY``. ``/metrics``
+    is served from the API, so worker-side ``record_job_event`` calls would be
+    invisible. Instead, every publisher just writes to the Redis channel and the
+    API alone updates metrics from the messages it reads here. If Redis is
+    unreachable the upstream subscribe loop only yields heartbeats, which we
+    skip — metrics stall during the outage but never drift.
+    """
+    while True:
+        try:
+            async for msg in subscribe_jobs_changed(heartbeat_seconds=30.0):
+                reason = msg.get("reason")
+                if not reason or reason == "heartbeat":
+                    continue
+                payload = msg.get("payload") or {}
+                record_job_event(reason, payload.get("provider_key"))
+        except asyncio.CancelledError:
+            raise
+        except Exception as exc:
+            logger.warning("metrics_subscriber_error err=%s", exc)
+            await asyncio.sleep(2.0)
 
 
 async def _run_periodic(coro_func, interval_seconds: int, task_name: str) -> None:
@@ -91,6 +117,11 @@ async def lifespan(_app: FastAPI):
                 _run_periodic(_reap_stale_jobs_safe, settings.job_reaper_interval_seconds, "reaper"),
                 name="stale-job-reaper",
             )
+        )
+
+    if settings.metrics_enabled:
+        background_tasks.append(
+            asyncio.create_task(_metrics_subscriber(), name="metrics-subscriber"),
         )
 
     logger.info(

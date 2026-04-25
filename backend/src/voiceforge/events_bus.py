@@ -57,15 +57,16 @@ def _sync_client() -> redis.Redis | None:
 
 
 def publish_jobs_changed(reason: str, *, payload: dict | None = None) -> None:
-    """Fire-and-forget notification. Never raises — Redis going down can't break a job commit."""
-    # Metrics are local; record before touching Redis so we still get them when Redis is down.
-    try:
-        from .observability import record_job_event
+    """Fire-and-forget notification. Never raises — Redis going down can't break a job commit.
 
-        record_job_event(reason, (payload or {}).get("provider_key"))
-    except Exception as exc:
-        logger.debug("events_bus_metric_record_failed err=%s", exc)
-
+    Note on metrics: this function does NOT record Prometheus metrics directly,
+    because publishers run in two processes — the API and the Dramatiq worker —
+    and each owns a separate in-memory ``REGISTRY``. If we recorded here, the
+    worker's increments/decrements would never reach the API's ``/metrics``
+    endpoint, and the in-flight gauge would only ever climb. Instead, the API
+    runs a single subscriber loop (see ``main._metrics_subscriber``) that reads
+    every message off the Redis channel and updates metrics there.
+    """
     client = _sync_client()
     if client is None:
         return
