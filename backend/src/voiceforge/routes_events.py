@@ -20,15 +20,25 @@ def get_snapshot(db: Session = Depends(get_db)):
     return build_live_snapshot(db)
 
 
-def _emit_snapshot() -> str:
+def _snapshot_with_signature() -> tuple[str, str]:
+    """Return (sse_event, signature) computed in a single DB session.
+
+    Reading signature *before* the snapshot in the same session guarantees
+    ``signature`` is ≤ the snapshot data — never ahead. If we did the reverse,
+    or used two sessions, a commit landing between the two reads could leave
+    ``last_signature`` pointing past data the client already received and the
+    update would be silently swallowed on the next compare.
+    """
     db = SessionLocal()
     try:
+        signature = build_live_signature(db)
         snapshot = build_live_snapshot(db)
         payload = snapshot.model_dump(mode="json")
     finally:
         db.close()
     event_id = str(int(datetime.utcnow().timestamp() * 1000))
-    return f"id: {event_id}\nevent: snapshot\ndata: {json.dumps(payload, ensure_ascii=False)}\n\n"
+    sse = f"id: {event_id}\nevent: snapshot\ndata: {json.dumps(payload, ensure_ascii=False)}\n\n"
+    return sse, signature
 
 
 def _current_signature() -> str:
@@ -50,9 +60,8 @@ async def stream_events(request: Request):
     """
 
     async def event_generator():
-        # initial snapshot so reconnecting clients get state immediately
-        yield _emit_snapshot()
-        last_signature = _current_signature()
+        sse, last_signature = _snapshot_with_signature()
+        yield sse
         heartbeat = float(getattr(settings, "event_stream_heartbeat_seconds", 15.0))
 
         async for message in subscribe_jobs_changed(heartbeat_seconds=heartbeat):
@@ -64,12 +73,12 @@ async def stream_events(request: Request):
                 # or a publisher missed a transition.
                 signature = _current_signature()
                 if signature != last_signature:
-                    yield _emit_snapshot()
-                    last_signature = signature
+                    sse, last_signature = _snapshot_with_signature()
+                    yield sse
                 else:
                     yield "event: heartbeat\ndata: {}\n\n"
                 continue
-            yield _emit_snapshot()
-            last_signature = _current_signature()
+            sse, last_signature = _snapshot_with_signature()
+            yield sse
 
     return StreamingResponse(event_generator(), media_type="text/event-stream")
