@@ -155,11 +155,20 @@ class S3ArtifactStorage:
             body.close()
 
     def exists(self, key: str) -> bool:
+        # Treat only the canonical "not found" responses as a False; surface
+        # 403/network/credential errors so callers don't silently assume
+        # missing artifacts and re-upload (or worse, return broken URLs).
+        from botocore.exceptions import ClientError
+
         try:
             self._client.head_object(Bucket=self._bucket, Key=self._full_key(key))
             return True
-        except Exception:
-            return False
+        except ClientError as exc:
+            code = exc.response.get("Error", {}).get("Code", "")
+            status = exc.response.get("ResponseMetadata", {}).get("HTTPStatusCode")
+            if code in ("404", "NoSuchKey", "NotFound") or status == 404:
+                return False
+            raise
 
     def delete(self, key: str) -> None:
         self._client.delete_object(Bucket=self._bucket, Key=self._full_key(key))

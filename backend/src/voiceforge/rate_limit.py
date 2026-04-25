@@ -53,7 +53,7 @@ def _sweep_stale_buckets(cutoff: float) -> None:
 
 def check_rate_limit(request: Request) -> None:
     """FastAPI dependency: 429 when the caller exceeds the configured rate."""
-    global _last_sweep
+    global _last_sweep  # noqa: PLW0603 — module-level state guarded by _lock
     limit = settings.rate_limit_per_minute
     if limit <= 0:
         return
@@ -81,7 +81,7 @@ def check_rate_limit(request: Request) -> None:
 
 def reset_rate_limit_state() -> None:
     """Test helper: clear all buckets."""
-    global _last_sweep
+    global _last_sweep  # noqa: PLW0603 — module-level state guarded by _lock
     with _lock:
         _buckets.clear()
         _last_sweep = 0.0

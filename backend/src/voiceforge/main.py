@@ -8,14 +8,14 @@ from uuid import uuid4
 
 from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
-
 from sqlalchemy import func, select
 
 from .api_router import build_api_router
 from .config import settings
 from .db import SessionLocal, init_db
+from .enums import JobStatus
 from .logging_setup import setup_logging
-from .models import JobStatus, SynthesisJob
+from .models import SynthesisJob
 from .observability import record_http, render_metrics, seed_jobs_in_flight
 from .services_catalog import refresh_catalog
 from .services_jobs import reap_stale_jobs
