@@ -346,11 +346,21 @@ export function openEventStream(onSnapshot: (snapshot: LiveSnapshot) => void): E
   return source;
 }
 
+function appendApiKey(url: string): string {
+  if (!API_KEY) return url;
+  // Browsers can't attach the X-API-Key header to <a href> or <audio src>
+  // requests, so we surface the key as a query param. The backend accepts both.
+  const separator = url.includes("?") ? "&" : "?";
+  return `${url}${separator}api_key=${encodeURIComponent(API_KEY)}`;
+}
+
 export function artifactUrl(relativeUrl: string): string {
-  return `${API_BASE}${relativeUrl}`;
+  return appendApiKey(`${API_BASE}${relativeUrl}`);
 }
 
 export function providerVoicePreviewUrl(providerKey: string, voiceId: string, text?: string): string {
   const query = text ? `?text=${encodeURIComponent(text)}` : "";
-  return `${API_BASE}/providers/${encodeURIComponent(providerKey)}/voices/${encodeURIComponent(voiceId)}/preview${query}`;
+  return appendApiKey(
+    `${API_BASE}/providers/${encodeURIComponent(providerKey)}/voices/${encodeURIComponent(voiceId)}/preview${query}`,
+  );
 }

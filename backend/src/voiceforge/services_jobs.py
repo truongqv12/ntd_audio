@@ -115,8 +115,10 @@ def list_jobs(
             return JobsResponse(items=[], total=0, limit=limit, offset=offset)
         base = base.where(SynthesisJob.project_id == project.id)
     if q:
-        like = f"%{q}%"
-        base = base.where(SynthesisJob.source_text.ilike(like))
+        # Escape LIKE wildcards so a search for "100%" doesn't match every row.
+        escaped = q.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+        like = f"%{escaped}%"
+        base = base.where(SynthesisJob.source_text.ilike(like, escape="\\"))
 
     total = db.scalar(select(func.count()).select_from(base.subquery())) or 0
     rows = db.scalars(base.order_by(SynthesisJob.created_at.desc()).limit(limit).offset(offset)).all()
