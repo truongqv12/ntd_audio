@@ -91,6 +91,8 @@ vendor/*
 
 .logs
 
+backups/
+
 /plans/reports/*
 .tmp
 .pytest*

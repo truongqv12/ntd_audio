@@ -129,6 +129,45 @@ def build_live_snapshot(db: Session) -> LiveSnapshotResponse:
     )
 
 
+def reap_stale_jobs(db: Session, max_runtime_seconds: int) -> int:
+    """Mark jobs as failed if they've been running longer than max_runtime_seconds.
+
+    Returns the number of jobs reaped. Used by the background reaper task to
+    recover from worker crashes that leave jobs stuck in `running` state.
+    """
+    from datetime import timedelta
+
+    cutoff = datetime.utcnow() - timedelta(seconds=max_runtime_seconds)
+    stmt = select(SynthesisJob).where(
+        SynthesisJob.status == JobStatus.running.value,
+        SynthesisJob.started_at.isnot(None),
+        SynthesisJob.started_at < cutoff,
+    )
+    stale_jobs = db.scalars(stmt).all()
+    if not stale_jobs:
+        return 0
+    now = datetime.utcnow()
+    for job in stale_jobs:
+        job.status = JobStatus.failed.value
+        job.error_message = f"stale job — exceeded {max_runtime_seconds}s runtime, reaped"
+        job.finished_at = now
+        db.add(JobEvent(
+            job_id=job.id,
+            event_type="reaped",
+            message="Job reaped after exceeding max runtime",
+            payload={"max_runtime_seconds": max_runtime_seconds},
+        ))
+        if job.project_script_row_id:
+            row = db.get(ProjectScriptRow, job.project_script_row_id)
+            if row:
+                row.status = JobStatus.failed.value
+                row.error_message = job.error_message
+                row.updated_at = now
+    db.commit()
+    logger.warning("reaped_stale_jobs count=%s max_runtime_seconds=%s", len(stale_jobs), max_runtime_seconds)
+    return len(stale_jobs)
+
+
 def build_live_signature(db: Session) -> str:
     latest_job = db.execute(select(func.count(SynthesisJob.id), func.max(SynthesisJob.created_at), func.max(SynthesisJob.finished_at))).one()
     latest_event = db.execute(select(func.count(JobEvent.id), func.max(JobEvent.created_at))).one()
