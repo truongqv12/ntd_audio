@@ -163,7 +163,8 @@
     "queued": "Đã xếp hàng",
     "running": "Đang chạy",
     "succeeded": "Thành công",
-    "failed": "Lỗi"
+    "failed": "Lỗi",
+    "canceled": "Đã huỷ"
   },
   "library": {
     "title": "Kho kết quả",
