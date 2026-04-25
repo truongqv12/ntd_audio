@@ -203,6 +203,7 @@ def retry_job(db: Session, job_id: str) -> JobResponse | None:
         row = db.get(ProjectScriptRow, original.project_script_row_id)
         if row:
             row.status = JobStatus.queued.value
+            row.last_job_id = new_job.id
             row.error_message = None
             row.updated_at = datetime.utcnow()
     db.commit()
