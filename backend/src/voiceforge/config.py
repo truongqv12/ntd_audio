@@ -78,6 +78,8 @@ class Settings(BaseSettings):
     bulk_import_max_rows: int = Field(default=5000, alias="BULK_IMPORT_MAX_ROWS")
     bulk_import_max_bytes: int = Field(default=5 * 1024 * 1024, alias="BULK_IMPORT_MAX_BYTES")
 
+    preview_max_chars: int = Field(default=500, alias="PREVIEW_MAX_CHARS")
+
     voicevox_base_url: str = Field(default="http://voicevox:50021", alias="VOICEVOX_BASE_URL")
     voicevox_timeout_seconds: float = Field(default=30.0, alias="VOICEVOX_TIMEOUT_SECONDS")
 
