@@ -1,4 +1,5 @@
-version: "3.9"
+# `version` field intentionally omitted — Compose v2 ignores it and warns when
+# present. Service definitions below are the source of truth.
 
 services:
   postgres:
@@ -118,12 +119,16 @@ services:
   frontend:
     build:
       context: ./frontend
-    environment:
-      VITE_API_BASE: http://localhost:8000
+      # VITE_API_BASE is read at *build time* by Vite (see frontend/Dockerfile).
+      # Override via `VITE_API_BASE` in the shell or .env before `docker compose build`.
+      args:
+        VITE_API_BASE: ${VITE_API_BASE:-http://localhost:8000}
     depends_on:
       - api
+    # The frontend image is multi-stage and serves the SPA via nginx on port 80.
+    # Map host 5173 → container 80 so existing docs/links keep working.
     ports:
-      - "5173:5173"
+      - "5173:80"
 
 volumes:
   postgres-data:
