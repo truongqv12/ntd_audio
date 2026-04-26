@@ -125,8 +125,23 @@ class Settings(BaseSettings):
     @field_validator("app_allowed_origins", "app_api_keys", mode="before")
     @classmethod
     def _split_csv(cls, value: object) -> object:
+        # Accept both CSV (`a,b,c`) and JSON array (`["a","b","c"]`) forms so
+        # operators upgrading from older pydantic-settings (which forced JSON for
+        # list[str] env vars) don't have their existing `.env` silently misparse.
+        # Without this, the JSON form would comma-split into garbage like
+        # `['["a"', '"b"', '"c"]']`.
         if isinstance(value, str):
-            return [item.strip() for item in value.split(",") if item.strip()]
+            text = value.strip()
+            if text.startswith("[") and text.endswith("]"):
+                import json
+
+                try:
+                    parsed = json.loads(text)
+                except json.JSONDecodeError:
+                    parsed = None
+                if isinstance(parsed, list):
+                    return [str(item).strip() for item in parsed if str(item).strip()]
+            return [item.strip() for item in text.split(",") if item.strip()]
         return value
 
     @field_validator("provider_concurrency_overrides", mode="before")
