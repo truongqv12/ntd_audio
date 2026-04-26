@@ -2,200 +2,285 @@
 
 > **Cho AI agents:** đây là tài liệu **hướng tương lai**. Mọi mục bên dưới **chưa được implement**. Không document chúng như đang tồn tại. Khi làm một mục, di chuyển khối tương ứng vào `feature-map.md` (kèm đường dẫn file đã land) và rút gọn entry tại đây.
 >
-> **Cho con người:** danh sách công việc post-Epic-4 đã sắp xếp theo độ ưu tiên — đưa `ntd_audio` từ "self-host được" lên "vận hành thoải mái ở quy mô lớn." Mỗi mục liệt kê triệu chứng, đề xuất, file ảnh hưởng, và cách verify khi land.
+> **Cho con người:** danh sách công việc post-Epic-4 đã sắp xếp theo độ ưu tiên, scope theo hình dạng deploy thực tế của dự án: **một người dùng, chạy stack trên một máy bằng Docker.** Mục tiêu là tối ưu giá trị tính năng và UX, không phải hạ tầng đa người dùng / platform-grade.
 
 ## TL;DR
 
-- Epic 1 → Epic 4 đã ship (operational safety, tooling, feature gaps, production readiness). Nền móng vững.
-- Phase tiếp theo là **wire-up & scale**: làm cho các mảnh Epic 4 đã đặt nền thực sự được sử dụng, plus multi-user, plus deploy ngoài Compose.
-- Tám sáng kiến dưới đây sắp xếp theo **mức tác động lên người vận hành self-host**, không theo độ khó implement.
+- Đối tượng triển khai là **một người, một Docker host**. Multi-user, multi-tenant, Kubernetes — cố tình nằm ngoài phạm vi.
+- Tier 1 là **tính năng mới hướng người dùng** (bulk import, multi-voice dialogue, subtitle output).
+- Tier 2 là **thích nghi host** (GPU detect, concurrency tuning).
+- Tier 3 là **quality of life** (provider plugins, retention đơn giản, smoke E2E).
+- Mục "Out of scope" liệt kê những gì cố tình bị loại khỏi roadmap trước và lý do.
+
+## Phạm vi: ai dùng cái này
+
+`ntd_audio` được xây cho người dev chạy trên máy mình để sản xuất audio TTS cho dự án cá nhân (video, podcast, audio drama, học liệu). Điều đó định hình mọi quyết định ưu tiên dưới đây:
+
+- **Auth** chỉ là "API key hoặc không có gì" — không có người thứ hai.
+- **Deploy** là `docker compose up`. Helm / Kubernetes / autoscaling không áp dụng.
+- **Worker** chạy cùng máy với API. Priority queue, dead-letter queue, per-tenant concurrency cap thêm phức tạp mà không lợi ích gì.
+- **Telemetry** không áp dụng — một install ẩn danh đơn lẻ không cho project học được gì.
 
 ## Cách tổ chức tài liệu này
 
 Mỗi mục:
-1. **Vì sao quan trọng** (pain cụ thể được loại bỏ).
+1. **Vì sao quan trọng** (pain cụ thể được loại bỏ cho install single-user).
 2. **Thay đổi gì** (file / component bị ảnh hưởng).
-3. **Acceptance criteria** ("xong" trông như thế nào — test chứng minh đã ship).
+3. **Acceptance criteria** (test chứng minh đã ship).
 4. **Rủi ro và migration** (install hiện hữu cần làm gì).
 
-## 1. Wire `ArtifactStorage` vào `write_artifact`
+---
 
-**Vì sao quan trọng.** Hôm nay, `STORAGE_BACKEND=s3` là no-op cho artifact mới: Protocol `ArtifactStorage` tồn tại trong `services/storage.py`, nhưng đường ghi thực tế trong `services_jobs.process_job` (và helper `storage.py` cũ mà nó gọi) ghi local filesystem vô điều kiện. Operator làm theo `self-hosting.md` set S3 env vars sẽ nhận setup hỏng âm thầm.
+## Tier 1 — Tính năng hướng người dùng
+
+### 1. Bulk import: TXT / CSV → batch project
+
+**Vì sao quan trọng.** Workflow phổ biến nhất là "tôi có một list câu, cho tôi một file audio mỗi câu." Hôm nay, mỗi dòng phải nhập tay trong `ScriptEditor`, từng dòng một. Đây là tính năng giá trị cao nhất danh sách.
 
 **Thay đổi gì.**
 
-- Thay các call `Path.write_bytes` / `cache_root` trực tiếp trong `services_jobs.process_job` bằng `storage = get_storage(); storage.write_bytes(key, audio_bytes)`.
+- Endpoint mới `POST /v1/projects/{key}/script-rows/bulk` nhận:
+  - `multipart/form-data` với attachment `.txt` (mỗi dòng = 1 row) hoặc `.csv` (cột text cấu hình được, cột `voice` và `speaker` tùy chọn).
+  - Option JSON: paste text thô và split theo newline / dòng trắng / delimiter tùy chỉnh.
+- Endpoint insert N `project_script_rows`, tùy chọn enqueue tất cả thành job một loạt, và trả về batch ID cấp project để track tiến độ.
+- Frontend: `ScriptEditor` có nút "Import" (file picker + drag-drop). Sau import, modal xác nhận hiện các row đã parse và cho user chọn: gán một voice cho tất cả, hoặc "dùng cột voice từ CSV".
+- Convention đặt tên output: `{project_key}_{row_index:03d}_{sanitized_text_prefix}.{ext}` để file có tên ổn định và sortable.
+- Action mới "Download all (zip)" trên trang project khi ≥ 2 job trong project là `succeeded`. Zip chứa file audio và (khi subtitle land — xem #3) subtitle tương ứng.
+
+**Acceptance criteria.**
+
+- User kéo `.txt` 50 dòng, chọn 1 voice, click Run, và có 50 file audio trong artifact của project.
+- User upload CSV như `text,voice` và có 1 audio per row, với voice override per-row được áp dụng.
+- Cancel hoạt động ở 2 mức: cancel cả batch (cancel mọi row queued/running) và cancel 1 row.
+- Tiến độ per-row visible (queued → running → succeeded/failed/canceled).
+
+**Rủi ro và migration.** Endpoint mới; không breaking change cho project hiện hữu.
+
+### 2. Multi-voice / dialogue mode
+
+**Vì sao quan trọng.** Hôm nay, tất cả row trong project dùng 1 voice (hoặc voice per-row, nhưng không có concept "speaker"). Cho podcast, audio drama, hoặc cảnh hội thoại, user muốn 2+ nhân vật nói, với speaker tag có tên xuyên suốt subtitle và export.
+
+**Thay đổi gì.**
+
+- Schema: `project_script_rows.speaker_label` (text nullable — "Anna", "Host", v.v.) và `projects.settings.speakers` (map JSON `speaker_label → voice_key`).
+- UI `ScriptEditor`: panel "Speakers" cho user định nghĩa `Anna → kokoro:af_heart`, `Host → openai:onyx`. Khi chỉnh row, chọn speaker auto-fill voice cho row đó.
+- Hai output mode per project (`projects.settings.output_mode`):
+  - **Stems** (default, hành vi hiện tại): 1 file audio per row.
+  - **Conversation**: kết thúc batch thành công, worker concat tất cả row theo thứ tự với silence giữa các đoạn cấu hình được (vd 300 ms) thành 1 file mixdown. Mixdown thành artifact riêng (kind `conversation_mixdown`).
+- Subtitle output (mục kế) mang theo speaker label.
+
+**Acceptance criteria.**
+
+- User định nghĩa được 2+ speaker, gán row cho speaker, và chạy batch.
+- Mode "Stems" tạo 1 file per row, đặt tên có speaker label (vd `001_anna_hello.wav`).
+- Mode "Conversation" tạo 1 file ghép row theo thứ tự, plus stem per-row.
+- Silence giữa các row cấu hình được per project (`projects.settings.conversation_gap_ms`).
+
+**Rủi ro và migration.** Thêm 2 cột schema + 1 settings key. Project hiện hữu: `speaker_label` null (xử lý như no-speaker), `output_mode` default `stems` (hành vi hiện tại).
+
+### 3. Subtitle output (.srt / .vtt)
+
+**Vì sao quan trọng.** Cho creator video (đối tượng tự nhiên của workflow TTS này), file audio đơn lẻ chỉ là một nửa asset. Họ muốn 1 subtitle file đồng bộ per row hoặc per conversation, với speaker label tùy chọn cho dialogue.
+
+**Thay đổi gì.**
+
+- Artifact kind mới: `subtitle` (extension `.srt`; `.vtt` qua query param khi download).
+- Cho engine emit timing info (một số cloud provider expose timestamp cấp phoneme hoặc câu), dùng timing đó trực tiếp.
+- Cho engine không có, ước lượng timing từ `audio_duration_ms` và `char_count` (uniform char/s trong row, sentence break align với punctuation).
+- Cho output mode "Conversation", subtitle là 1 `.srt` ghép cover toàn mixdown, mỗi row 1 cue và speaker label (nếu có) làm prefix (`[Anna] Hello there.`).
+- Frontend: download subtitle xuất hiện cạnh download audio trên trang project.
+
+**Acceptance criteria.**
+
+- Sau job thành công, download subtitle trả SRT hợp lệ (verify với thư viện `srt`).
+- Mode conversation tạo 1 SRT ghép; mode stems tạo 1 SRT per row.
+- Cho engine emit timestamp thật (vd Google Cloud TTS markup mode), boundary cue SRT match audio thực tế nói (trong dung sai nhỏ).
+- Cho engine không có timing info, SRT ít nhất monotonic và tổng duration match audio file.
+
+**Rủi ro và migration.** Thuần addition. Artifact kind mới cần migration enum nhưng không destructive.
+
+### 4. Inline preview 1 row
+
+**Vì sao quan trọng.** Cloud TTS tính phí theo ký tự; OSS local cũng không miễn phí (CPU/GPU + warmup). Hôm nay, cách duy nhất nghe row là enqueue full job. Preview 1 row là feedback nhanh và tiết kiệm quota.
+
+**Thay đổi gì.**
+
+- Endpoint mới `POST /v1/preview` nhận `{ text, voice, params }`, chạy đồng bộ trong API process (hoặc fast queue cho cloud-bound) với hard timeout (~ 15 s), stream audio về body response.
+- Kết quả preview bypass `synthesis_jobs` — không lưu vào artifact catalog.
+- Frontend: mỗi row trong editor có nút nhỏ "Preview". Hover state + skeleton trong khi đợi; auto-stop nếu user move on.
+
+**Acceptance criteria.**
+
+- Preview trả audio < 15 s cho cloud TTS; cho OSS engine, preview hoặc thành công trong 30 s hoặc trả 504.
+- Preview không bao giờ tạo row `synthesis_jobs`.
+- Rate-limit áp lên preview như mọi endpoint khác (`RATE_LIMIT_PER_MINUTE`).
+- Audio preview không ghi disk (in-memory only, response stream).
+
+**Rủi ro và migration.** Endpoint mới, additive.
+
+### 5. Project export bundle
+
+**Vì sao quan trọng.** Project hoàn thành (script + voice mapping + audio + subtitle) là content portable user muốn backup, share, hoặc move giữa máy. Hôm nay, export yêu cầu tải tay từng artifact và nhớ voice nào đã dùng.
+
+**Thay đổi gì.**
+
+- Endpoint mới `GET /v1/projects/{key}/export` trả zip chứa:
+  - `script.json` — dump full row, gồm `text`, `voice`, `speaker`, ordering.
+  - `voice-map.json` — mapping speaker-to-voice-key (resolve theo catalog tại thời điểm export).
+  - `original.txt` / `original.csv` — file đã import (nếu có), giữ nguyên văn.
+  - `audio/` — mọi artifact thành công, đặt tên theo convention từ #1.
+  - `subtitles/` — file `.srt` tương ứng (khi #3 land).
+  - `metadata.json` — project ID, title, timestamp tạo/update, schema version.
+- Đảo: `POST /v1/projects/import` nhận cùng zip và recreate project (idempotent trên `project_key`; artifact hiện hữu được reuse).
+
+**Acceptance criteria.**
+
+- Export project 50 row tạo 1 zip chứa mọi row, mọi audio, voice map.
+- Import zip đó trên install mới recreate project với row giống thứ tự.
+- Round-trip (export → import → export) tạo script.json và voice-map.json byte-identical.
+
+**Rủi ro và migration.** Thuần addition. Schema export là phần của contract công khai; bump yêu cầu CHANGELOG entry.
+
+---
+
+## Tier 2 — Thích nghi host
+
+### 6. Auto-detect GPU / CPU
+
+**Vì sao quan trọng.** Engine OSS (đặc biệt Kokoro và VieNeu) chạy nhanh hơn rõ rệt trên GPU. Hôm nay, user phải tự chọn đúng Compose overlay và tin engine container pick GPU. Không có UI surface báo GPU acceleration có thực sự hoạt động không.
+
+**Thay đổi gì.**
+
+- Lúc API startup, probe host:
+  - `nvidia-smi` có sẵn và trả device không?
+  - `/dev/dri` populated không (Intel/AMD)?
+  - `os.cpu_count()` báo gì?
+- Expose ở `GET /v1/system/capabilities` (gate bằng API key khi có): `{ gpu: { vendor, name, vram_mb } | null, cpu: { cores, threads }, recommended_overlays: [...] }`.
+- Per engine container, mở rộng `/healthz` nhỏ báo lại engine load lên device nào (CPU vs CUDA).
+- Frontend: Settings → tab "Host" hiện hardware đã detect và engine nào đang dùng nó. Nếu có GPU nhưng overlay CPU-only đang active, surface hint "switch to GPU overlay" 1-click với câu lệnh `docker compose` chính xác.
+
+**Acceptance criteria.**
+
+- Trên host có NVIDIA GPU, `/v1/system/capabilities` báo đúng.
+- Trên host CPU-only, field GPU là `null` và recommended overlay không gồm variant GPU.
+- Tab Settings → Host match cái engine container thực sự báo.
+
+**Rủi ro và migration.** Thuần addition. Không breaking change.
+
+### 7. Concurrency tuning per provider
+
+**Vì sao quan trọng.** Endpoint cloud TTS network-bound và chạy 4-8 song song thoải mái. Engine OSS trên 1 CPU bão hòa quanh 1-2 job đồng thời. Hôm nay, có 1 worker prefetch global — quá cao cho OSS, quá thấp cho cloud. User nhận batch chậm hoặc host thrash.
+
+**Thay đổi gì.**
+
+- `concurrency_hint` mới per-provider trong registry (vd `openai_tts: 8`, `voicevox: 2`, `kokoro: 1`).
+- Worker dispatch đọc hint và dùng semaphore in-process per `provider_key` để batch 50 row OpenAI chạy 8-wide trong khi batch 50 row Kokoro chạy 1-wide.
+- Settings → panel "Performance": slider per provider (default = hint từ registry, cap = 16). Giá trị chọn persist trong `app_settings`.
+- Cap global default là `min(os.cpu_count(), 4)` cho OSS engine và `8` cho cloud engine.
+
+**Acceptance criteria.**
+
+- Chạy batch 20 row chống `openai_tts` hoàn thành nhanh hơn rõ rệt so với chạy serial cùng batch (trong giới hạn rate-limit của network/provider).
+- Chạy batch 20 row chống `voicevox` không peg load của host 4 core trên 4.
+- UI Settings tôn trọng override; set cloud = 1 force serial execution.
+
+**Rủi ro và migration.** Key `app_settings` mới; install hiện hữu default về hint registry.
+
+### 8. Wire `ArtifactStorage` vào `write_artifact`
+
+**Vì sao quan trọng.** Kể cả install cá nhân, user thường muốn artifact ghi vào NAS, ổ ngoài, hoặc bucket S3-compatible trên home server (MinIO). Hôm nay, `STORAGE_BACKEND=s3` là no-op cho artifact mới vì đường ghi cũ bypass Protocol `ArtifactStorage`. Theo `self-hosting.md` set env vars sẽ ra setup hỏng âm thầm.
+
+**Thay đổi gì.**
+
+- Thay call `Path.write_bytes` / `cache_root` trực tiếp trong `services_jobs.process_job` bằng `storage = get_storage(); storage.write_bytes(key, audio_bytes)`.
 - Tương tự cho đường ghi `generation_cache`.
-- Migrate đường đọc (`/v1/jobs/{id}/artifact`, library download) đọc qua abstraction.
-- Thêm integration test boot localstack / minio container và round-trip artifact qua `S3ArtifactStorage`.
-- Document trade-off S3 vs local rõ ràng trong `self-hosting.md` (đã cover về cấu trúc; cần callout "cái này **không** làm gì" khi local được chọn — ví dụ migration zero-downtime giữa các backend nằm ngoài phạm vi).
+- Migrate đường đọc đọc qua abstraction.
+- Thêm smoke test boot MinIO trong CI và round-trip artifact.
+- Document trong `self-hosting.md` rằng migration local → S3 cho artifact hiện hữu yêu cầu `aws s3 sync` (không copy tự động lúc boot).
 
 **Acceptance criteria.**
 
 - `STORAGE_BACKEND=s3` cộng `S3_*` env vars khiến job mới ghi vào bucket; download stream từ bucket; không gì chạm `ARTIFACT_ROOT`.
 - `STORAGE_BACKEND=local` tiếp tục hoạt động bit-for-bit như cũ.
-- Integration test mới: `pytest backend/tests/test_storage_s3.py` chạy với MinIO trong CI.
+- Integration test mới pass với MinIO trong CI.
 
-**Rủi ro và migration.** Install `local` hiện hữu không bị ảnh hưởng (default không đổi). Cho install migrate `local → s3`, không có copy tự động; document `aws s3 sync $ARTIFACT_ROOT s3://$S3_BUCKET/$S3_PREFIX` trong `operations.md`.
+**Rủi ro và migration.** Install `local` hiện hữu không bị ảnh hưởng (default không đổi).
 
-## 2. JWT / multi-user auth
+---
 
-**Vì sao quan trọng.** API-key gate hiện tại (`X-API-Key`) về bản chất là single-tenant: mọi key có cùng quyền lực trên mọi project, mọi job, mọi setting. Operator self-host muốn share deployment với đồng đội không có per-user audit, không có revocation granular, không có cách scope key vào project.
+## Tier 3 — Quality of life
 
-**Thay đổi gì.**
+### 9. Provider plugin entry points
 
-- Schema: `users (id, email, password_hash, created_at, disabled_at)`, `sessions (id, user_id, expires_at, ...)`, `api_tokens (id, user_id, name, hashed_token, scopes, last_used_at, expires_at)`. Optional ở v1: tier workspace (`workspaces`, `workspace_members`).
-- Surface auth: `/v1/auth/login` (email + password), `/v1/auth/logout`, `/v1/auth/sessions/me`, `/v1/auth/tokens` (CRUD). Session cookie (HttpOnly, SameSite=Strict) cho SPA; bearer token cho truy cập programmatic.
-- Authz: mọi endpoint hiện hữu nhận dependency `current_user`. `X-API-Key` cũ tiếp tục hoạt động (đọc như token với scope "owner" implicit) để không phá integration cũ.
-- Frontend: trang login, session bootstrap, logout. Settings → tab "Tokens" để quản lý token cá nhân.
-- Hash password: `argon2-cffi` (đã là transitive dep của `passlib` nếu dùng; nếu không thì add direct).
-
-**Acceptance criteria.**
-
-- Một user có thể đăng ký (hoặc admin seed), login, và vận hành app hoàn toàn qua session cookie.
-- Một user có thể tạo named token với expiry tùy chọn và revoke.
-- Setup `APP_API_KEYS` hiện hữu vẫn chạy, được xử lý như legacy "superuser" token.
-- Test mới cover: chính sách lockout login fail, revocation token, enforce scope trên ít nhất một endpoint.
-
-**Rủi ro và migration.** Đây là mục lớn nhất danh sách. Migration schema không tầm thường và phải reversible. Install single-user hiện hữu default về "không yêu cầu auth" nếu `APP_API_KEYS` rỗng — auth mới phải giữ ergonomic đó trong dev (vd: `APP_AUTH_MODE=open|api-key|jwt`).
-
-## 3. Worker scaling primitives
-
-**Vì sao quan trọng.** Hôm nay, worker là một Dramatiq actor trên queue `voiceforge`. Replicate ngang được (`docker compose up --scale worker=3`), nhưng **không có priority routing**, **không có dead-letter queue**, **không có per-project concurrency cap**, và **không có graceful drain khi deploy**. Một synthesis dài của user này sẽ starve job nhanh của user khác. Một provider lỗi sẽ retry mãi mãi (Dramatiq default) mà không có DLQ để inspect.
+**Vì sao quan trọng.** Thêm engine TTS hôm nay yêu cầu sửa registry. Cho install cá nhân, user thỉnh thoảng muốn plug model riêng (fine-tune, checkpoint research, model ngôn ngữ niche) mà không fork dự án.
 
 **Thay đổi gì.**
 
-- Tách thành hai queue: `voiceforge.fast` (cloud TTS, expected < 30s) và `voiceforge.slow` (engine OSS local, text lớn hơn). Route theo duration dự đoán dựa trên `provider_key` và `len(text)`.
-- Cấu hình Dramatiq middleware: `Retries(max_retries=3, retry_when=...)`, `CurrentMessage`, `AsyncIO` nếu cần. Thêm DLQ middleware tùy chỉnh: khi exhaust retry, ghi row vào `dead_letter_jobs` (table cần thêm) và publish `reason=dead_lettered`.
-- Per-project concurrency cap qua semaphore Redis-backed (`SETNX project:{key}:slots:{i}`). Số job đồng thời tối đa per project lấy từ `projects.settings.max_concurrent_jobs`.
-- Graceful drain: handler SIGTERM finish task in-flight rồi exit; document termination grace period của worker (`stop_grace_period: 120s`) trong compose.
-
-**Acceptance criteria.**
-
-- Hai replica của `worker` chạy độc lập; load phân phối; cancel/retry vẫn hoạt động.
-- Job fail exhaust retry land trong `dead_letter_jobs` và visible ở `/v1/jobs?status=dead_lettered`.
-- Set `projects.settings.max_concurrent_jobs=1` serialize job project đó kể cả khi nhiều worker.
-- Kill worker với `docker compose stop worker` không corrupt job in-flight (chúng finish hoặc bị reaper xử lý).
-
-**Rủi ro và migration.** Tách queue là thay đổi config Dramatiq; job đang queued có thể land sai queue trong cửa sổ upgrade. Mitigation: script one-shot re-route pending job sau upgrade.
-
-## 4. End-to-end browser tests (Playwright)
-
-**Vì sao quan trọng.** Vitest cover component cô lập; pytest cover handler. Không cái nào bắt được "tôi click New Job, chọn voice, submit, kết quả không hiện." E2E test bắt integration glue (CORS, SSE reconnection, drift contract form ↔ API).
-
-**Thay đổi gì.**
-
-- Thêm `frontend/e2e/` với Playwright. Ba scenario cho v1:
-  1. **Smoke:** mở `/`, thấy Dashboard, thấy ít nhất một project (default bootstrap).
-  2. **Tạo + complete một job:** tạo job với stub provider trả file audio cố định, đợi qua SSE đến `succeeded`, download artifact.
-  3. **Hủy một job dài:** start với provider chậm, click Cancel, xác nhận state `canceled` propagate.
-- Compose profile `e2e` riêng boot stub provider sidecar (`engines/stub-runtime/`), để test không phụ thuộc cloud API thật.
-- CI job mới: `frontend-e2e` trên PR chạm `frontend/`, `backend/`, hoặc `engines/`.
-
-**Acceptance criteria.**
-
-- `make e2e` build stack, chạy Playwright, tear down. Chạy local và CI.
-- E2E fail block PR merge trên path liên quan.
-- Test artifacts (screenshot + video khi fail) upload vào GitHub Actions run.
-
-**Rủi ro và migration.** CI minutes mới. Mitigate bằng cách chỉ chạy E2E trên path liên quan và trên `main`.
-
-## 5. Provider plugin system
-
-**Vì sao quan trọng.** Thêm engine TTS hôm nay yêu cầu sửa `backend/src/voiceforge/providers/__init__.py` để register. Block hai use case thực: (a) operator self-host muốn thêm model nội bộ mà không fork, và (b) giữ list provider upstream manageable khi engine mới xuất hiện.
-
-**Thay đổi gì.**
-
-- Định nghĩa Protocol provider ổn định trong `backend/src/voiceforge/providers/protocol.py` (đã formalize một phần; biến thành ABC tagged).
-- Discover provider qua Python entry points: `[project.entry-points."voiceforge.providers"]`. Provider built-in (voicevox, piper, kokoro, vieneu, openai, elevenlabs, google, azure) chuyển sang entry; registry load lúc startup.
-- Cho phép `pip install voiceforge-provider-foo` phía operator để thêm provider mà không thay đổi code ở đây.
-- Schema cho `provider parameter schemas` (đã structure per-provider) trở thành phần của return entry-point — registry đọc schema động.
+- Định nghĩa Protocol provider ổn định (đã formalize một phần) và biến thành ABC tagged.
+- Discover provider qua `[project.entry-points."voiceforge.providers"]`. Provider built-in chuyển sang entry; registry load lúc startup.
+- Plugin ví dụ nhỏ trong `examples/voiceforge-provider-stub` show contract.
+- `docs/en/providers.md` thêm section "Tự build provider".
 
 **Acceptance criteria.**
 
 - Mọi provider hiện hữu tiếp tục hoạt động, register qua entry point.
-- Plugin ví dụ nhỏ trong directory riêng (`examples/voiceforge-provider-stub`) demonstrate contract; cài được bằng `pip install -e ./examples/...` và xuất hiện trong catalog.
-- Protocol provider được document trong `docs/en/providers.md` với section "Tự build provider".
+- Plugin ví dụ cài được bằng `pip install -e ./examples/...` và xuất hiện trong catalog.
 
 **Rủi ro và migration.** Nội bộ — không có breaking change phía operator.
 
-## 6. Helm chart cho Kubernetes
+### 10. Retention controls đơn giản
 
-**Vì sao quan trọng.** Compose tốt cho self-host single-host. Vượt quá đó (multi-replica, autoscale, Postgres managed, Redis managed), operator chuyển sang Kubernetes. Helm chart first-class giữ deployment story của dự án nhất quán.
-
-**Thay đổi gì.**
-
-- Chart mới `deploy/helm/ntd-audio/`. Một Deployment per service (api, worker, frontend), một Job cho `migrate`, sub-chart optional cho Postgres / Redis (hoặc BYO qua values).
-- Engine sidecar trở thành optional `values.engines.{voicevox,piper,kokoro,vieneu}.enabled`.
-- Secret qua `values.secrets` (operator có thể wire ExternalSecrets / Sealed Secrets / cloud KMS).
-- Template Ingress với TLS qua cert-manager.
-- Probe health/readiness từ `/health` (đã thiết kế cho việc này).
-- Hook `helm test` hit `/health` và `/metrics` chống chart đã deploy.
-
-**Acceptance criteria.**
-
-- `helm install ntd-audio deploy/helm/ntd-audio --set ...` ra app chạy được trên cluster kind / k3d.
-- `helm test` pass.
-- Chart publish lên Helm repo backed bởi GitHub Pages khi tag.
-- Document trên `self-hosting.md` (hoặc `kubernetes.md` mới) với ví dụ values.
-
-**Rủi ro và migration.** Surface deployment mới phải maintain. Defer cho đến khi đường Compose hoàn toàn ổn định (đã ổn định).
-
-## 7. Telemetry opt-in ẩn danh
-
-**Vì sao quan trọng.** "Engine nào phổ biến? Script điển hình lớn cỡ nào? Feature nào người ta thực sự dùng?" — những câu hỏi này feed prioritization. Không có telemetry, dự án bay mù. **Strict opt-in** là design duy nhất chấp nhận được — surveillance-mặc-định không tương thích với self-host.
+**Vì sao quan trọng.** Artifact và row `generation_cache` tích lũy mãi mãi. User casual với nhiều tháng experiment cuối cùng đầy disk. Roadmap trước đề xuất full retention policy table per-project — overkill cho personal use.
 
 **Thay đổi gì.**
 
-- Env var mới `TELEMETRY_ENABLED=false` (default). Operator phải set explicit `true`.
-- Ping nhỏ daily từ API: `POST https://telemetry.<domain dự án>/v1/install` với:
-  - Anonymous install ID (UUID generate ở first run, persist trong `app_settings`).
-  - Version, OS / arch.
-  - Đếm số (không phải nội dung) của: job theo provider (24h), project active, voice distinct sử dụng.
-  - **Không bao giờ:** nội dung text, sample voice, tên project, dữ liệu user.
-- Schema payload chính xác được document trong `docs/en/operations.md` dưới section "Telemetry" mới. Schema là phần của contract công khai; thay đổi yêu cầu CHANGELOG entry.
-- `/v1/settings/telemetry/preview` trả JSON chính xác sẽ gửi hôm nay, để operator audit được.
+- Settings → panel "Storage": hiện disk usage artifact hiện tại, với nút duy nhất **"Delete jobs older than X days"** (slider, default 30 d, filter status tùy chọn: `failed` / `canceled` / `succeeded` / all).
+- Endpoint backend `POST /v1/admin/retention/run-now { older_than_days, statuses }` — đồng bộ cho batch nhỏ, queued cho batch lớn.
+- Đếm metric `voiceforge_artifacts_pruned_total{reason}` để user thấy bao nhiêu đã reclaim.
 
 **Acceptance criteria.**
 
-- `TELEMETRY_ENABLED=false` (default) không gửi gì — verify bằng network test.
-- `TELEMETRY_ENABLED=true` gửi payload đã document daily.
-- Operator preview và audit được mọi payload trước khi gửi.
-- Document làm rõ guarantee data minimization và liệt kê mọi field với rationale.
+- User click "Delete jobs older than 30 days, failed only" và thấy disk usage giảm tương ứng.
+- Action xóa cả DB row và storage object (chạy cho `local` và `s3`).
+- Bước confirm tránh wipe nhầm cả history.
 
-**Rủi ro và migration.** Không có cho install hiện hữu (default off). Niềm tin phụ thuộc vào tính minh bạch.
+**Rủi ro và migration.** Destructive; action opt-in only và có confirm.
 
-## 8. Garbage collection cho artifact
+### 11. Playwright smoke E2E
 
-**Vì sao quan trọng.** Artifact và row `generation_cache` tích lũy mãi mãi hôm nay. Install dùng nặng cuối cùng sẽ đầy disk hoặc S3 bucket. Không có cần để control retention ngoài delete thủ công.
+**Vì sao quan trọng.** Vitest cover component cô lập; pytest cover handler. Không cái nào bắt được "tôi import CSV, queue batch, đợi qua SSE, và zip download không có đủ file." Một scenario smoke chặt bắt được class regression rộng.
 
 **Thay đổi gì.**
 
-- Table mới `retention_policies` (hoặc cột trên `projects.settings.retention`): `keep_days_succeeded`, `keep_days_failed`, `keep_days_canceled`. Default: `keep_days_succeeded=null` (mãi mãi), `keep_days_failed=30`, `keep_days_canceled=14`.
-- Job nightly (Dramatiq scheduled actor):
-  - Select job cũ hơn policy.
-  - Mỗi job: delete artifact qua `ArtifactStorage.delete(key)`, delete row `generation_cache`, set `synthesis_jobs.archived_at`.
-  - Đếm metric: `voiceforge_artifacts_pruned_total{reason}`.
-- Endpoint admin `POST /v1/admin/retention/run-now` để trigger thủ công (gate bởi superuser).
-- Document policy default và cách override per-project.
+- Một scenario: **bulk import → run → wait → download zip**. CSV 5 row, 2 voice, output mode "Conversation", expect 5 stem + 1 mixdown + 1 SRT trong zip.
+- Chạy chống stub-provider Compose profile để không phụ thuộc cloud API.
+- CI job mới `frontend-e2e` trên PR chạm `frontend/`, `backend/`, hoặc `engines/`.
 
 **Acceptance criteria.**
 
-- Test tạo job aged (với `created_at` backdate) xác nhận chúng bị prune bởi pass GC.
-- Pruning tôn trọng `ArtifactStorage` được chọn (chạy trên S3 và local).
-- Operator disable GC hoàn toàn được với `RETENTION_ENABLED=false`.
+- `make e2e` build stack, chạy scenario, tear down. Chạy local và CI.
+- E2E fail block PR merge trên path liên quan.
 
-**Rủi ro và migration.** Đây là destructive; env var mới default off ở v1 và on ở v2 sau feedback operator.
+**Rủi ro và migration.** CI minutes mới — limit cho path liên quan.
 
-## Vượt qua v1 của danh sách này
+---
 
-Chưa prioritize nhưng trên radar:
+## Out of scope (cố tình loại)
 
-- **i18n: thêm locale** (JP, ZH, KR). Tooling frontend đã support; công việc là dịch.
-- **Test coverage frontend** ở mức component cho ScriptEditor (drag-drop), Settings (provider creds), Library (paginated, filterable).
-- **UX voice cloning.** Khả năng tồn tại với ElevenLabs, VieNeu — UI chưa support sạch upload reference audio, đặt tên clone, route job đến đó.
-- **Export / import project.** User self-host muốn "project bundle" portable (script row + voice mapping + artifact đã hoàn thành) cho backup, share, migration.
-- **WebSocket hoặc SSE-over-HTTP/2 cho event.** SSE chạy nhưng không multiplex; trên mạng chậm có thể đụng giới hạn connection-per-tab.
+Các mục này đã được đề xuất ở roadmap trước và cố tình **không** theo đuổi, do scope personal-use:
+
+| Loại | Lý do |
+|---|---|
+| **JWT / multi-user auth** | Một user. Gate `X-API-Key` hiện tại đủ; không cần tài khoản, session, audit per-user. |
+| **Workspace boundary / per-user audit** | Tương tự — vấn đề multi-tenant không áp dụng. |
+| **Helm chart cho Kubernetes** | Một Docker host. Compose là deployment story. |
+| **Worker scaling primitives (DLQ, priority queue, per-project concurrency cap)** | Một host với một worker không hưởng lợi gì. Tier 2 #7 (concurrency tuning) cover nhu cầu thực sự cho personal use. |
+| **Telemetry opt-in ẩn danh** | Một install ẩn danh đơn lẻ không cho signal đáng thu thập. Phức tạp không xứng. |
+| **Per-project retention policy (full table + nightly cron)** | Tier 3 #10 (1 nút "delete older than X days" duy nhất) cover nhu cầu thực với 1/10 phức tạp. |
+
+Nếu scope dự án thay đổi (multi-user, hosted offering, fleet deployment), revisit section này.
+
+---
 
 ## Cách đề xuất sáng kiến mới
 
