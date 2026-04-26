@@ -24,6 +24,7 @@ class ProviderSummaryResponse(BaseModel):
     reachable: bool
     reason: str
     capabilities: ProviderCapabilitiesResponse
+    concurrency_limit: int = 1
 
 
 class VoiceCatalogEntryResponse(BaseModel):

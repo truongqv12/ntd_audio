@@ -145,24 +145,19 @@ Implemented in `routes_providers.py::preview_arbitrary_text` + `previewRowSynthe
 
 **Risk and migration.** Pure addition. No breaking change.
 
-### 7. Concurrency tuning per provider
+### 7. Concurrency tuning per provider — **shipped**
 
-**Why it matters.** Cloud TTS endpoints are network-bound and happily run 4–8 in parallel. OSS engines on a single CPU saturate around 1–2 concurrent jobs. Today, there's a single global worker prefetch — too high for OSS, too low for cloud. The user gets either a slow batch or a thrashing host.
+Implemented in `services_provider_concurrency.py`, wrapping the synthesize call in `services_jobs.process_job`.
 
-**What changes.**
+- Process-local `BoundedSemaphore` per provider key; created lazily on first job.
+- Defaults: `cloud` providers → 4 concurrent calls (network-bound), `self_hosted` → 1 (single CPU/GPU backend).
+- Per-category overrides via `PROVIDER_CONCURRENCY_CLOUD` / `PROVIDER_CONCURRENCY_SELF_HOSTED`.
+- Per-provider override via `PROVIDER_CONCURRENCY` (JSON dict, e.g. `{"openai": 6, "voicevox": 2}`).
+- The active limit is exposed in `GET /v1/providers` as `concurrency_limit` so the UI can display it.
 
-- New per-provider `concurrency_hint` in the provider registry (e.g. `openai_tts: 8`, `voicevox: 2`, `kokoro: 1`).
-- Worker dispatch reads the hint and uses an in-process semaphore per `provider_key` so a batch of 50 OpenAI rows runs 8-wide while a batch of 50 Kokoro rows runs 1-wide.
-- Settings → "Performance" panel: a slider per provider (default = the registry hint, cap = 16). The chosen values persist in `app_settings`.
-- Default global cap is `min(os.cpu_count(), 4)` for OSS engines and `8` for cloud engines.
+If you scale by running multiple worker processes (e.g. `dramatiq voiceforge.tasks --processes 2`), the effective ceiling is `worker_count * provider_limit`. For personal-use single-host installs this is the right tradeoff (no Redis-side coordination needed).
 
-**Acceptance criteria.**
-
-- Running a 20-row batch against `openai_tts` completes substantially faster than the same batch ran serially (within network/provider rate-limit bounds).
-- Running a 20-row batch against `voicevox` doesn't peg a 4-core host's load above 4.
-- The Settings UI honors the override; setting cloud = 1 forces serial execution.
-
-**Risk and migration.** New `app_settings` key; existing installs default to the registry hint.
+A future iteration may add a Settings → "Performance" panel that persists overrides in `app_settings` so changes don't require an env reload. Not implemented yet — env-driven configuration covers the personal-use case.
 
 ### 8. Wire `ArtifactStorage` into `write_artifact`
 

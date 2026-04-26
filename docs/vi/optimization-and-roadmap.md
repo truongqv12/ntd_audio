@@ -145,24 +145,19 @@ Triển khai trong `routes_providers.py::preview_arbitrary_text` + helper `previ
 
 **Rủi ro và migration.** Thuần addition. Không breaking change.
 
-### 7. Concurrency tuning per provider
+### 7. Concurrency tuning per provider — **đã ship**
 
-**Vì sao quan trọng.** Endpoint cloud TTS network-bound và chạy 4-8 song song thoải mái. Engine OSS trên 1 CPU bão hòa quanh 1-2 job đồng thời. Hôm nay, có 1 worker prefetch global — quá cao cho OSS, quá thấp cho cloud. User nhận batch chậm hoặc host thrash.
+Triển khai trong `services_provider_concurrency.py`, wrap synthesize call ở `services_jobs.process_job`.
 
-**Thay đổi gì.**
+- `BoundedSemaphore` process-local per provider key; tạo lazy lúc job đầu chạy.
+- Default: provider `cloud` → 4 call song song (network-bound), `self_hosted` → 1 (1 backend CPU/GPU duy nhất).
+- Override theo category: `PROVIDER_CONCURRENCY_CLOUD` / `PROVIDER_CONCURRENCY_SELF_HOSTED`.
+- Override per-provider: `PROVIDER_CONCURRENCY` (JSON dict, vd `{"openai": 6, "voicevox": 2}`).
+- Limit hiện hành lộ ra ở `GET /v1/providers` qua field `concurrency_limit`.
 
-- `concurrency_hint` mới per-provider trong registry (vd `openai_tts: 8`, `voicevox: 2`, `kokoro: 1`).
-- Worker dispatch đọc hint và dùng semaphore in-process per `provider_key` để batch 50 row OpenAI chạy 8-wide trong khi batch 50 row Kokoro chạy 1-wide.
-- Settings → panel "Performance": slider per provider (default = hint từ registry, cap = 16). Giá trị chọn persist trong `app_settings`.
-- Cap global default là `min(os.cpu_count(), 4)` cho OSS engine và `8` cho cloud engine.
+Nếu scale bằng nhiều worker process (vd `dramatiq voiceforge.tasks --processes 2`), trần thực tế là `worker_count * provider_limit`. Với personal-use single-host, đây là tradeoff đúng (không cần coordination Redis-side).
 
-**Acceptance criteria.**
-
-- Chạy batch 20 row chống `openai_tts` hoàn thành nhanh hơn rõ rệt so với chạy serial cùng batch (trong giới hạn rate-limit của network/provider).
-- Chạy batch 20 row chống `voicevox` không peg load của host 4 core trên 4.
-- UI Settings tôn trọng override; set cloud = 1 force serial execution.
-
-**Rủi ro và migration.** Key `app_settings` mới; install hiện hữu default về hint registry.
+Bản tiếp theo có thể thêm Settings → "Performance" panel để persist override trong `app_settings`. Hiện chưa làm — env-driven đã đủ cho personal-use.
 
 ### 8. Wire `ArtifactStorage` vào `write_artifact`
 

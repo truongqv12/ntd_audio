@@ -80,6 +80,10 @@ class Settings(BaseSettings):
 
     preview_max_chars: int = Field(default=500, alias="PREVIEW_MAX_CHARS")
 
+    provider_concurrency_overrides: dict[str, int] = Field(default_factory=dict, alias="PROVIDER_CONCURRENCY")
+    provider_concurrency_default_cloud: int = Field(default=4, alias="PROVIDER_CONCURRENCY_CLOUD")
+    provider_concurrency_default_self_hosted: int = Field(default=1, alias="PROVIDER_CONCURRENCY_SELF_HOSTED")
+
     voicevox_base_url: str = Field(default="http://voicevox:50021", alias="VOICEVOX_BASE_URL")
     voicevox_timeout_seconds: float = Field(default=30.0, alias="VOICEVOX_TIMEOUT_SECONDS")
 
@@ -116,6 +120,24 @@ class Settings(BaseSettings):
     def _split_csv(cls, value: object) -> object:
         if isinstance(value, str):
             return [item.strip() for item in value.split(",") if item.strip()]
+        return value
+
+    @field_validator("provider_concurrency_overrides", mode="before")
+    @classmethod
+    def _parse_concurrency(cls, value: object) -> object:
+        if isinstance(value, str):
+            text = value.strip()
+            if not text:
+                return {}
+            import json
+
+            try:
+                parsed = json.loads(text)
+            except json.JSONDecodeError as exc:
+                raise ValueError(f"PROVIDER_CONCURRENCY must be a JSON object: {exc}") from exc
+            if not isinstance(parsed, dict):
+                raise ValueError("PROVIDER_CONCURRENCY must be a JSON object")
+            return {str(k): int(v) for k, v in parsed.items()}
         return value
 
 
