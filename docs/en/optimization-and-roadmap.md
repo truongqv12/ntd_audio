@@ -138,25 +138,13 @@ If you scale by running multiple worker processes (e.g. `dramatiq voiceforge.tas
 
 A future iteration may add a Settings → "Performance" panel that persists overrides in `app_settings` so changes don't require an env reload. Not implemented yet — env-driven configuration covers the personal-use case.
 
-### 8. Wire `ArtifactStorage` into `write_artifact`
+### 8. Wire `ArtifactStorage` into `write_artifact` — **shipped (write path)**
 
-**Why it matters.** Even on a personal install, the user often wants artifacts written to a NAS, an external drive, or an S3-compatible bucket on a home server (MinIO). Today, `STORAGE_BACKEND=s3` is a no-op for new artifacts because the legacy write path bypasses the `ArtifactStorage` Protocol. Following `self-hosting.md` and setting the env vars yields a silently broken setup.
+`storage.py::write_artifact` now delegates to `services.storage.get_storage().write_bytes(...)`. Operators who set `STORAGE_BACKEND=s3` (or re-target `ARTIFACT_ROOT` to a NAS / external HDD) finally get the bytes routed through the abstraction. The function's contract `(relative_key, size, sha256_hex)` is unchanged.
 
-**What changes.**
+Reads (`artifact_absolute_path` + `FileResponse`) are still local-fs only. Adding S3 read / redirect support — either streaming bytes back through FastAPI or returning a presigned URL — is the natural follow-up but is intentionally out of scope here so this PR is small and reviewable.
 
-- Replace direct `Path.write_bytes` / `cache_root` calls in `services_jobs.process_job` with `storage = get_storage(); storage.write_bytes(key, audio_bytes)`.
-- Same for the `generation_cache` write path.
-- Migrate the read path to read through the abstraction.
-- Add a smoke test that boots MinIO in CI and round-trips an artifact.
-- Document in `self-hosting.md` that local → S3 migration of existing artifacts requires `aws s3 sync` (no automatic copy on boot).
-
-**Acceptance criteria.**
-
-- `STORAGE_BACKEND=s3` plus `S3_*` env vars makes new jobs write into the bucket; downloads stream from the bucket; nothing touches `ARTIFACT_ROOT`.
-- `STORAGE_BACKEND=local` continues to work bit-for-bit identically.
-- New integration test passes against MinIO in CI.
-
-**Risk and migration.** Existing `local` installs unaffected (default unchanged).
+Migrating an existing local artifact tree to S3 still needs an out-of-band `aws s3 sync` (no automatic copy on boot).
 
 ---
 

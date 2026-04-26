@@ -113,6 +113,7 @@ flowchart TB
 | Prometheus `/metrics` with single-subscriber metric pipeline | ✅ | `backend/src/voiceforge/observability.py`, `main.py::_metrics_subscriber` |
 | In-flight gauge seeded from DB + clamped to ≥ 0 | ✅ | `main.py::lifespan`, `observability.py::record_job_event` |
 | T2.6 — Host capability probe (`GET /v1/system/capabilities`) | ✅ | `services_system.py`, `routes_system.py`, Settings → Host panel |
+| T2.8 — `write_artifact` flows through `ArtifactStorage` | ✅ | `storage.py::write_artifact`, `services/storage.py::get_storage` |
 
 ## Personal-use roadmap (T1+)
 
