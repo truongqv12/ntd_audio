@@ -168,23 +168,14 @@ Migration tree artifact local hiện hữu sang S3 vẫn cần `aws s3 sync` ngo
 
 **Rủi ro và migration.** Nội bộ — không có breaking change phía operator.
 
-### 10. Retention controls đơn giản
+### 10. Retention controls đơn giản — **đã ship**
 
-**Vì sao quan trọng.** Artifact và row `generation_cache` tích lũy mãi mãi. User casual với nhiều tháng experiment cuối cùng đầy disk. Roadmap trước đề xuất full retention policy table per-project — overkill cho personal use.
+Trang Settings có panel "Retention" với window "Cũ hơn (ngày)" cấu hình được (default 30). Endpoint mới:
 
-**Thay đổi gì.**
+- `GET /v1/admin/retention/preview?older_than_days=N` trả `{ cutoff_iso, job_count, artifact_count, bytes_on_disk }`.
+- `POST /v1/admin/retention/purge` body `{ older_than_days: N, confirm: true }` xóa terminal job (`succeeded`/`failed`/`canceled`) cũ hơn cutoff cùng artifact (DB row + file trên disk). API reject nếu thiếu `confirm: true`.
 
-- Settings → panel "Storage": hiện disk usage artifact hiện tại, với nút duy nhất **"Delete jobs older than X days"** (slider, default 30 d, filter status tùy chọn: `failed` / `canceled` / `succeeded` / all).
-- Endpoint backend `POST /v1/admin/retention/run-now { older_than_days, statuses }` — đồng bộ cho batch nhỏ, queued cho batch lớn.
-- Đếm metric `voiceforge_artifacts_pruned_total{reason}` để user thấy bao nhiêu đã reclaim.
-
-**Acceptance criteria.**
-
-- User click "Delete jobs older than 30 days, failed only" và thấy disk usage giảm tương ứng.
-- Action xóa cả DB row và storage object (chạy cho `local` và `s3`).
-- Bước confirm tránh wipe nhầm cả history.
-
-**Rủi ro và migration.** Destructive; action opt-in only và có confirm.
+Flow UI là preview → confirm → delete: nút "Xóa ngay" disable đến khi load được preview non-empty. Job active và recent không bao giờ bị động. Counter `voiceforge_artifacts_pruned_total` và filter theo status là follow-up có chủ ý.
 
 ### 11. Playwright smoke E2E
 

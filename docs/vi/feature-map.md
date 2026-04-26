@@ -114,6 +114,7 @@ flowchart TB
 | Gauge in-flight seed từ DB + clamp ≥ 0 | ✅ | `main.py::lifespan`, `observability.py::record_job_event` |
 | T2.6 — Probe capability host (`GET /v1/system/capabilities`) | ✅ | `services_system.py`, `routes_system.py`, Settings → panel Host |
 | T2.8 — `write_artifact` route qua `ArtifactStorage` | ✅ | `storage.py::write_artifact`, `services/storage.py::get_storage` |
+| T3.10 — Retention preview/purge (`/v1/admin/retention/{preview,purge}`) | ✅ | `backend/src/voiceforge/services_retention.py`, `routes_retention.py` |
 
 ## Personal-use roadmap (T1+)
 

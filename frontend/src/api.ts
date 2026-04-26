@@ -344,6 +344,32 @@ export async function fetchHostCapabilities(): Promise<HostCapabilities> {
   return response.json();
 }
 
+export type RetentionPreview = {
+  cutoff_iso: string;
+  job_count: number;
+  artifact_count: number;
+  bytes_on_disk: number;
+};
+
+export async function fetchRetentionPreview(olderThanDays: number): Promise<RetentionPreview> {
+  const response = await apiFetch(`/admin/retention/preview?older_than_days=${olderThanDays}`);
+  if (!response.ok) throw new Error("Unable to fetch retention preview");
+  return response.json();
+}
+
+export async function purgeRetention(olderThanDays: number): Promise<RetentionPreview> {
+  const response = await apiFetch(`/admin/retention/purge`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ older_than_days: olderThanDays, confirm: true }),
+  });
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(text || "Unable to purge");
+  }
+  return response.json();
+}
+
 export async function fetchHealth(): Promise<HealthResponse> {
   const response = await apiFetch(`/health`);
   if (!response.ok) throw new Error("Unable to fetch health");

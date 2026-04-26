@@ -168,23 +168,14 @@ Migrating an existing local artifact tree to S3 still needs an out-of-band `aws 
 
 **Risk and migration.** Internal — no operator-facing breaking change.
 
-### 10. Simple retention controls
+### 10. Simple retention controls — **shipped**
 
-**Why it matters.** Artifacts and `generation_cache` rows accumulate forever. A casual user with months of experimentation eventually fills disk. The previous roadmap proposed a full per-project retention policy table — overkill for personal use.
+Settings page gains a "Retention" panel with a configurable "older than (days)" window (default 30). New endpoints:
 
-**What changes.**
+- `GET /v1/admin/retention/preview?older_than_days=N` returns `{ cutoff_iso, job_count, artifact_count, bytes_on_disk }`.
+- `POST /v1/admin/retention/purge` body `{ older_than_days: N, confirm: true }` deletes terminal jobs (`succeeded`/`failed`/`canceled`) older than the cutoff plus their artifacts (DB rows + files on disk). The API rejects calls without `confirm: true`.
 
-- Settings → "Storage" panel: shows current artifact disk usage, with a single button **"Delete jobs older than X days"** (slider, default 30 d, optional filter by status: `failed` / `canceled` / `succeeded` / all).
-- Backend endpoint `POST /v1/admin/retention/run-now { older_than_days, statuses }` — synchronous for small batches, queued for large ones.
-- Counts metric `voiceforge_artifacts_pruned_total{reason}` so the user can see how much was reclaimed.
-
-**Acceptance criteria.**
-
-- A user can click "Delete jobs older than 30 days, failed only" and see disk usage drop accordingly.
-- The action removes both DB rows and storage objects (works for `local` and `s3`).
-- A confirmation step prevents accidental whole-history wipes.
-
-**Risk and migration.** Destructive; the action is opt-in only and shows a confirmation.
+The UI flow is preview → confirm → delete: the "Delete now" button stays disabled until a non-empty preview is loaded. Active and recent jobs are never touched. The `voiceforge_artifacts_pruned_total` counter and per-status filtering are deliberate follow-ups.
 
 ### 11. Playwright smoke E2E
 

@@ -9,6 +9,7 @@ from .routes_monitor import router as monitor_router
 from .routes_project_rows import router as project_rows_router
 from .routes_projects import router as projects_router
 from .routes_providers import router as providers_router
+from .routes_retention import router as retention_router
 from .routes_settings import router as settings_router
 from .routes_system import router as system_router
 from .security.api_key import require_api_key
@@ -34,6 +35,7 @@ def _build_api_router() -> APIRouter:
     router.include_router(events_router, dependencies=protected)
     router.include_router(monitor_router, dependencies=protected)
     router.include_router(system_router, dependencies=protected)
+    router.include_router(retention_router, dependencies=protected)
     return router
 
 

@@ -10,6 +10,13 @@ import type {
 import { Panel } from "../components/Panel";
 import { useI18n } from "../i18n";
 import { fetchHostCapabilities, updateMergeDefaults, updateProviderCredentials } from "../api";
+import {
+  fetchRetentionPreview,
+  purgeRetention,
+  updateMergeDefaults,
+  updateProviderCredentials,
+  type RetentionPreview,
+} from "../api";
 
 function cloneCredentialFields(credential: ProviderCredential) {
   return Object.fromEntries(
@@ -56,6 +63,9 @@ export const SettingsPage = memo(function SettingsPage({
       alive = false;
     };
   }, []);
+  const [retentionDays, setRetentionDays] = useState(30);
+  const [retentionPreview, setRetentionPreview] = useState<RetentionPreview | null>(null);
+  const [retentionBusy, setRetentionBusy] = useState(false);
 
   const credentials = settingsOverview?.provider_credentials ?? [];
   const schemas = settingsOverview?.voice_parameter_schemas ?? {};
@@ -111,6 +121,33 @@ export const SettingsPage = memo(function SettingsPage({
       await onRefresh(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to save merge defaults");
+    }
+  }
+
+  async function loadRetentionPreview() {
+    try {
+      setError(null);
+      setRetentionBusy(true);
+      const result = await fetchRetentionPreview(retentionDays);
+      setRetentionPreview(result);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to fetch retention preview");
+    } finally {
+      setRetentionBusy(false);
+    }
+  }
+
+  async function runRetentionPurge() {
+    try {
+      setError(null);
+      setRetentionBusy(true);
+      const result = await purgeRetention(retentionDays);
+      setRetentionPreview(result);
+      setMessage(`Purged ${result.job_count} jobs / ${result.artifact_count} artifacts.`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to purge");
+    } finally {
+      setRetentionBusy(false);
     }
   }
 
@@ -376,6 +413,51 @@ export const SettingsPage = memo(function SettingsPage({
         ) : (
           <small className="muted-copy">{t("settingsPage.hostLoading")}</small>
         )}
+      </Panel>
+
+      <Panel title={t("settingsPage.retentionTitle")} description={t("settingsPage.retentionDescription")}>
+        <div className="filter-inline-grid">
+          <div className="form-field compact">
+            <label>{t("settingsPage.retentionDaysLabel")}</label>
+            <input
+              type="number"
+              min={0}
+              value={retentionDays}
+              onChange={(event) => setRetentionDays(Math.max(0, Number(event.target.value)))}
+            />
+          </div>
+        </div>
+        <div className="script-action-column">
+          <button
+            type="button"
+            className="ghost-button"
+            disabled={retentionBusy}
+            onClick={() => void loadRetentionPreview()}
+          >
+            {t("settingsPage.retentionPreviewButton")}
+          </button>
+          <button
+            type="button"
+            className="primary-button"
+            disabled={retentionBusy || !retentionPreview || retentionPreview.job_count === 0}
+            onClick={() => void runRetentionPurge()}
+          >
+            {t("settingsPage.retentionPurgeButton")}
+          </button>
+        </div>
+        {retentionPreview ? (
+          retentionPreview.job_count === 0 ? (
+            <small>{t("settingsPage.retentionEmpty")}</small>
+          ) : (
+            <small>
+              {t("settingsPage.retentionPreviewSummary", {
+                jobs: retentionPreview.job_count,
+                artifacts: retentionPreview.artifact_count,
+                mb: (retentionPreview.bytes_on_disk / (1024 * 1024)).toFixed(1),
+              })}
+            </small>
+          )
+        ) : null}
       </Panel>
 
       <Panel title={t("settingsPage.systemTitle")} description={t("settingsPage.systemDescription")}>
