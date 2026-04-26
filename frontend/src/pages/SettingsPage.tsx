@@ -1,6 +1,7 @@
 import { memo, useEffect, useMemo, useState } from "react";
 import type {
   HealthResponse,
+  HostCapabilities,
   Project,
   ProviderCredential,
   ProviderSummary,
@@ -8,7 +9,7 @@ import type {
 } from "../types";
 import { Panel } from "../components/Panel";
 import { useI18n } from "../i18n";
-import { updateMergeDefaults, updateProviderCredentials } from "../api";
+import { fetchHostCapabilities, updateMergeDefaults, updateProviderCredentials } from "../api";
 
 function cloneCredentialFields(credential: ProviderCredential) {
   return Object.fromEntries(
@@ -40,6 +41,21 @@ export const SettingsPage = memo(function SettingsPage({
   const [savingProvider, setSavingProvider] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [host, setHost] = useState<HostCapabilities | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    fetchHostCapabilities()
+      .then((caps) => {
+        if (alive) setHost(caps);
+      })
+      .catch(() => {
+        /* non-fatal */
+      });
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   const credentials = settingsOverview?.provider_credentials ?? [];
   const schemas = settingsOverview?.voice_parameter_schemas ?? {};
@@ -334,6 +350,32 @@ export const SettingsPage = memo(function SettingsPage({
             </details>
           ))}
         </div>
+      </Panel>
+
+      <Panel title={t("settingsPage.hostTitle")} description={t("settingsPage.hostDescription")}>
+        {host ? (
+          <div className="filter-inline-grid">
+            <div>
+              <strong>{t("settingsPage.hostGpu")}: </strong>
+              {host.gpu ? `${host.gpu.name} (${host.gpu.vram_mb} MB)` : t("settingsPage.hostNoGpu")}
+            </div>
+            <div>
+              <strong>{t("settingsPage.hostCpu")}: </strong>
+              {host.cpu.cores} {t("settingsPage.hostCores")} / {host.cpu.threads}{" "}
+              {t("settingsPage.hostThreads")}
+            </div>
+            {host.recommended_overlays.length ? (
+              <div>
+                <strong>{t("settingsPage.hostOverlay")}: </strong>
+                <code>
+                  docker compose -f docker-compose.yml -f {host.recommended_overlays.join(" -f ")} up -d
+                </code>
+              </div>
+            ) : null}
+          </div>
+        ) : (
+          <small className="muted-copy">{t("settingsPage.hostLoading")}</small>
+        )}
       </Panel>
 
       <Panel title={t("settingsPage.systemTitle")} description={t("settingsPage.systemDescription")}>

@@ -210,6 +210,12 @@ export type HealthResponse = {
   >;
 };
 
+export type HostCapabilities = {
+  gpu: { vendor: string; name: string; vram_mb: number } | null;
+  cpu: { cores: number; threads: number };
+  recommended_overlays: string[];
+};
+
 export type LiveSnapshot = {
   generated_at: string;
   jobs: Job[];
