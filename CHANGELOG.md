@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
+- **`APP_ALLOWED_ORIGINS` / `APP_API_KEYS` now accept both CSV and JSON-array form.** The previous fix added `NoDecode` to make CSV (the form `.env.example` documented) parse correctly, but that broke the JSON-array form (`["http://..."]`) that operators *had* to use under older pydantic-settings. The `_split_csv` validator now sniffs for a `[...]` prefix/suffix and `json.loads` it before falling back to comma splitting, so both forms work and `.env` files written under either convention keep parsing.
 - **Stack-up was broken on a fresh clone.** Five build/run regressions surfaced when running `docker compose up` on a clean machine; this release fixes all of them so `cp .env.example .env && docker compose up` works end-to-end.
   - `backend/Dockerfile` no longer references the non-existent `catalogs/` directory (BuildKit failed the build with `"/catalogs": not found`).
   - `app_allowed_origins` and `app_api_keys` (`list[str]` settings) are now annotated `Annotated[list[str], NoDecode]` so the documented CSV form in `.env.example` (e.g. `APP_ALLOWED_ORIGINS=http://localhost:5173,http://localhost:4173`) loads cleanly. Without `NoDecode`, pydantic-settings ≥ 2.x JSON-decoded the value before the `mode="before"` CSV validator ran, crashing migrate / api / worker startup with `JSONDecodeError`. Bumped `pydantic-settings` floor to `>=2.6` (which is when `NoDecode` shipped).

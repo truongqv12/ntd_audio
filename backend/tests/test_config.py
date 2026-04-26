@@ -40,3 +40,23 @@ def test_app_api_keys_csv_from_env(monkeypatch):
     monkeypatch.setenv("APP_API_KEYS", "key-one,key-two")
     parsed = Settings(_env_file=None)
     assert parsed.app_api_keys == ["key-one", "key-two"]
+
+
+def test_app_allowed_origins_json_array_from_env(monkeypatch):
+    """JSON-array form must also work — older pydantic-settings forced this format,
+    so users upgrading must not silently get garbage origins."""
+    from voiceforge.config import Settings
+
+    monkeypatch.setenv(
+        "APP_ALLOWED_ORIGINS", '["http://localhost:5173", "http://localhost:4173"]'
+    )
+    parsed = Settings(_env_file=None)
+    assert parsed.app_allowed_origins == ["http://localhost:5173", "http://localhost:4173"]
+
+
+def test_app_api_keys_json_array_from_env(monkeypatch):
+    from voiceforge.config import Settings
+
+    monkeypatch.setenv("APP_API_KEYS", '["key-a", "key-b"]')
+    parsed = Settings(_env_file=None)
+    assert parsed.app_api_keys == ["key-a", "key-b"]
