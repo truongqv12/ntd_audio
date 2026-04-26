@@ -150,23 +150,18 @@ Migration tree artifact local hiện hữu sang S3 vẫn cần `aws s3 sync` ngo
 
 ## Tier 3 — Quality of life
 
-### 9. Provider plugin entry points
+### 9. Provider plugin entry points — **đã ship (discovery)**
 
-**Vì sao quan trọng.** Thêm engine TTS hôm nay yêu cầu sửa registry. Cho install cá nhân, user thỉnh thoảng muốn plug model riêng (fine-tune, checkpoint research, model ngôn ngữ niche) mà không fork dự án.
+Registry hiện discover provider thứ ba từ entry-point group `voiceforge.providers` lúc startup. Một package có dạng
 
-**Thay đổi gì.**
+```toml
+[project.entry-points."voiceforge.providers"]
+my_engine = "my_pkg.module:MyProvider"
+```
 
-- Định nghĩa Protocol provider ổn định (đã formalize một phần) và biến thành ABC tagged.
-- Discover provider qua `[project.entry-points."voiceforge.providers"]`. Provider built-in chuyển sang entry; registry load lúc startup.
-- Plugin ví dụ nhỏ trong `examples/voiceforge-provider-stub` show contract.
-- `docs/en/providers.md` thêm section "Tự build provider".
+đăng ký provider ngay khi `pip install` vào cùng environment với API. Factory có thể là class hoặc callable trả instance của `VoiceProvider`. Lỗi lúc discovery được log và skip — một plugin hỏng không làm chết API. Plugin không thể shadow key built-in (built-in thắng, plugin được log và ignore).
 
-**Acceptance criteria.**
-
-- Mọi provider hiện hữu tiếp tục hoạt động, register qua entry point.
-- Plugin ví dụ cài được bằng `pip install -e ./examples/...` và xuất hiện trong catalog.
-
-**Rủi ro và migration.** Nội bộ — không có breaking change phía operator.
+Provider built-in vẫn import eager để cold-start cost và mypy strictness không đổi. Migrate chúng sang entry point là follow-up khả thi nhưng không cần thiết cho use case ("cho tôi ship model riêng"). `examples/voiceforge-provider-stub` cùng section "Tự build provider" trong `docs/en/providers.md` là bước tiếp theo tự nhiên.
 
 ### 10. Retention controls đơn giản — **đã ship**
 

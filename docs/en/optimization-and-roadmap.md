@@ -150,23 +150,18 @@ Migrating an existing local artifact tree to S3 still needs an out-of-band `aws 
 
 ## Tier 3 — Quality of life
 
-### 9. Provider plugin entry points
+### 9. Provider plugin entry points — **shipped (discovery)**
 
-**Why it matters.** Adding a TTS engine today requires editing the provider registry. For a personal install, the user occasionally wants to plug in their own model (a fine-tune, a research checkpoint, a niche language model) without forking the project.
+The registry now discovers third-party providers from the `voiceforge.providers` setuptools entry-point group at startup. A package shaped like
 
-**What changes.**
+```toml
+[project.entry-points."voiceforge.providers"]
+my_engine = "my_pkg.module:MyProvider"
+```
 
-- Define a stable provider Protocol (already partially formalized) and turn it into a tagged ABC.
-- Discover providers via `[project.entry-points."voiceforge.providers"]`. The built-in ones move to entries; the registry loads them at startup.
-- A small example plugin in `examples/voiceforge-provider-stub` shows the contract.
-- `docs/en/providers.md` gains a "Build your own" section.
+registers a provider as soon as it's `pip install`-ed into the same environment as the API. The factory may be a class or a callable returning an instance of `VoiceProvider`. Failures during discovery are logged and skipped — one broken plugin will not take the API down. Plugins cannot shadow built-in keys (the built-in wins, plugin is logged and ignored).
 
-**Acceptance criteria.**
-
-- All existing providers continue to work, registered via entry points.
-- The example plugin is installable with `pip install -e ./examples/...` and shows up in the catalog.
-
-**Risk and migration.** Internal — no operator-facing breaking change.
+The built-in providers stay imported eagerly so cold-start cost and `mypy` strictness don't change. Migrating them to entry points is a possible follow-up but not necessary for the use case ("let me ship my own model"). `examples/voiceforge-provider-stub` is the natural next addition along with a "Build your own" section in `docs/en/providers.md`.
 
 ### 10. Simple retention controls — **shipped**
 

@@ -115,6 +115,7 @@ flowchart TB
 | T2.6 — Probe capability host (`GET /v1/system/capabilities`) | ✅ | `services_system.py`, `routes_system.py`, Settings → panel Host |
 | T2.8 — `write_artifact` route qua `ArtifactStorage` | ✅ | `storage.py::write_artifact`, `services/storage.py::get_storage` |
 | T3.10 — Retention preview/purge (`/v1/admin/retention/{preview,purge}`) | ✅ | `backend/src/voiceforge/services_retention.py`, `routes_retention.py` |
+| T3.9 — Provider plugin entry points (group `voiceforge.providers`) | ✅ | `backend/src/voiceforge/provider_registry.py` |
 
 ## Personal-use roadmap (T1+)
 
