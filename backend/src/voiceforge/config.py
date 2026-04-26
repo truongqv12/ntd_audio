@@ -75,6 +75,9 @@ class Settings(BaseSettings):
     job_reaper_interval_seconds: int = Field(default=60, alias="JOB_REAPER_INTERVAL_SECONDS")
     job_reaper_enabled: bool = Field(default=True, alias="JOB_REAPER_ENABLED")
 
+    bulk_import_max_rows: int = Field(default=5000, alias="BULK_IMPORT_MAX_ROWS")
+    bulk_import_max_bytes: int = Field(default=5 * 1024 * 1024, alias="BULK_IMPORT_MAX_BYTES")
+
     voicevox_base_url: str = Field(default="http://voicevox:50021", alias="VOICEVOX_BASE_URL")
     voicevox_timeout_seconds: float = Field(default=30.0, alias="VOICEVOX_TIMEOUT_SECONDS")
 

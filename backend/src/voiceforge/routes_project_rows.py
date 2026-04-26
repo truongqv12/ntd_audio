@@ -1,23 +1,30 @@
 from pathlib import Path
+from typing import Literal
 
-from fastapi import APIRouter, Depends, HTTPException
-from fastapi.responses import FileResponse
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+from fastapi.responses import FileResponse, StreamingResponse
 from sqlalchemy.orm import Session
 
+from .config import settings
 from .db import get_db
 from .schemas import (
+    BulkImportResponse,
     ProjectBatchQueueResponse,
     ProjectMergeResponse,
     ProjectRowsResponse,
     QueueProjectRowsRequest,
     UpsertProjectRowsRequest,
 )
+from .services_bulk_import import parse_csv, parse_txt
 from .services_project_rows import (
+    bulk_import_rows,
+    bulk_import_to_response,
     list_project_rows,
     merge_project_rows,
     project_row_artifact_path,
     queue_project_rows,
     replace_project_rows,
+    stream_artifacts_zip,
 )
 from .tasks import run_synthesis_job
 
@@ -59,6 +66,88 @@ def merge_rows(
     if response is None:
         raise HTTPException(status_code=404, detail="Project not found")
     return response
+
+
+@router.post("/bulk", response_model=BulkImportResponse)
+async def bulk_import(
+    project_key: str,
+    file: UploadFile = File(...),
+    file_format: Literal["txt", "csv"] = Form("txt", alias="format"),
+    text_column: str = Form("text"),
+    voice_column: str | None = Form(None),
+    speaker_column: str | None = Form(None),
+    title_column: str | None = Form(None),
+    txt_split: Literal["line", "blank-line"] = Form("line"),
+    default_provider_key: str | None = Form(None),
+    default_voice_id: str | None = Form(None),
+    auto_enqueue: bool = Form(False),
+    db: Session = Depends(get_db),
+) -> BulkImportResponse:
+    raw = await file.read()
+    if len(raw) > settings.bulk_import_max_bytes:
+        raise HTTPException(
+            status_code=413,
+            detail=f"File exceeds limit ({settings.bulk_import_max_bytes} bytes)",
+        )
+    try:
+        if file_format == "txt":
+            parsed = parse_txt(raw, split=txt_split)
+        else:
+            parsed = parse_csv(
+                raw,
+                text_column=text_column,
+                voice_column=voice_column,
+                speaker_column=speaker_column,
+                title_column=title_column,
+            )
+    except (UnicodeDecodeError, ValueError) as exc:
+        raise HTTPException(status_code=422, detail=f"Could not parse file: {exc}") from exc
+
+    if not parsed:
+        raise HTTPException(status_code=422, detail="No usable rows were found in the upload")
+    if len(parsed) > settings.bulk_import_max_rows:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Too many rows ({len(parsed)} > {settings.bulk_import_max_rows})",
+        )
+
+    project, rows = bulk_import_rows(
+        db,
+        project_key,
+        parsed,
+        default_provider_key=default_provider_key,
+        default_voice_id=default_voice_id,
+    )
+    response = bulk_import_to_response(project, rows)
+
+    if auto_enqueue:
+        queue_response = queue_project_rows(
+            db,
+            project_key,
+            QueueProjectRowsRequest(row_ids=[row.id for row in rows]),
+        )
+        if queue_response is not None:
+            for job in queue_response.queued_jobs:
+                run_synthesis_job.send(job.id)
+            response.queued_jobs = queue_response.queued_jobs
+            for row in rows:
+                db.refresh(row)
+            response = bulk_import_to_response(project, rows)
+            response.queued_jobs = queue_response.queued_jobs
+    return response
+
+
+@router.get("/artifacts.zip")
+def download_artifacts_zip(
+    project_key: str,
+    status: str | None = "succeeded",
+    db: Session = Depends(get_db),
+) -> StreamingResponse:
+    chunks = stream_artifacts_zip(db, project_key, status_filter=status)
+    if chunks is None:
+        raise HTTPException(status_code=404, detail="Project not found")
+    headers = {"Content-Disposition": f'attachment; filename="{project_key}-artifacts.zip"'}
+    return StreamingResponse(chunks, media_type="application/zip", headers=headers)
 
 
 @router.get("/{row_id}/artifact")

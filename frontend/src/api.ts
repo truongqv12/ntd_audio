@@ -1,4 +1,5 @@
 import type {
+  BulkImportResponse,
   CatalogResponse,
   HealthResponse,
   Job,
@@ -60,14 +61,11 @@ export async function updateProviderCredentials(
   providerKey: string,
   fields: Record<string, unknown>,
 ): Promise<import("./types").ProviderCredential> {
-  const response = await apiFetch(
-    `/settings/provider-credentials/${encodeURIComponent(providerKey)}`,
-    {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ fields }),
-    },
-  );
+  const response = await apiFetch(`/settings/provider-credentials/${encodeURIComponent(providerKey)}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ fields }),
+  });
   if (!response.ok) {
     const text = await response.text();
     throw new Error(text || "Unable to update provider credentials");
@@ -282,6 +280,63 @@ export async function mergeProjectRows(
   return response.json();
 }
 
+export type BulkImportPayload = {
+  file: File;
+  format: "txt" | "csv";
+  text_column?: string;
+  voice_column?: string | null;
+  speaker_column?: string | null;
+  title_column?: string | null;
+  txt_split?: "line" | "blank-line";
+  default_provider_key?: string | null;
+  default_voice_id?: string | null;
+  auto_enqueue?: boolean;
+};
+
+export async function bulkImportRows(
+  projectKey: string,
+  payload: BulkImportPayload,
+): Promise<BulkImportResponse> {
+  const form = new FormData();
+  form.append("file", payload.file);
+  form.append("format", payload.format);
+  if (payload.text_column) form.append("text_column", payload.text_column);
+  if (payload.voice_column) form.append("voice_column", payload.voice_column);
+  if (payload.speaker_column) form.append("speaker_column", payload.speaker_column);
+  if (payload.title_column) form.append("title_column", payload.title_column);
+  if (payload.txt_split) form.append("txt_split", payload.txt_split);
+  if (payload.default_provider_key) form.append("default_provider_key", payload.default_provider_key);
+  if (payload.default_voice_id) form.append("default_voice_id", payload.default_voice_id);
+  if (payload.auto_enqueue !== undefined) form.append("auto_enqueue", String(payload.auto_enqueue));
+  const response = await apiFetch(`/projects/${projectKey}/rows/bulk`, {
+    method: "POST",
+    body: form,
+  });
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(text || "Bulk import failed");
+  }
+  return response.json();
+}
+
+export function projectArtifactsZipUrl(projectKey: string, status: string = "succeeded"): string {
+  const params = new URLSearchParams({ status });
+  return `${API_BASE}/projects/${projectKey}/rows/artifacts.zip?${params.toString()}`;
+}
+
+export async function downloadProjectArtifactsZip(
+  projectKey: string,
+  status: string = "succeeded",
+): Promise<Blob> {
+  const params = new URLSearchParams({ status });
+  const response = await apiFetch(`/projects/${projectKey}/rows/artifacts.zip?${params.toString()}`);
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(text || "Download failed");
+  }
+  return response.blob();
+}
+
 export async function fetchHealth(): Promise<HealthResponse> {
   const response = await apiFetch(`/health`);
   if (!response.ok) throw new Error("Unable to fetch health");
@@ -301,9 +356,7 @@ export async function fetchMonitorLogSources(): Promise<LogSource[]> {
 }
 
 export async function fetchMonitorLogs(source = "api", limit = 200): Promise<LogTail> {
-  const response = await apiFetch(
-    `/monitor/logs?source=${encodeURIComponent(source)}&limit=${limit}`,
-  );
+  const response = await apiFetch(`/monitor/logs?source=${encodeURIComponent(source)}&limit=${limit}`);
   if (!response.ok) throw new Error("Unable to fetch logs");
   return response.json();
 }

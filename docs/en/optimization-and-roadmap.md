@@ -33,28 +33,16 @@ For each item:
 
 ## Tier 1 — User-facing features
 
-### 1. Bulk import: TXT / CSV → batch project
+### 1. Bulk import: TXT / CSV → batch project — **shipped**
 
-**Why it matters.** The single most common workflow is "I have a list of sentences, give me one audio file per sentence." Today, every line has to be entered manually in `ScriptEditor`, one at a time. This is the highest-value feature on the list.
+Implemented in `routes_project_rows.py` + `services_bulk_import.py` + `BulkImportDialog.tsx`.
 
-**What changes.**
+- `POST /v1/projects/{key}/rows/bulk` (multipart): TXT with line / blank-line split, CSV with configurable `text_column`, optional `voice_column`, `speaker_column`, `title_column`. `auto_enqueue=true` queues all imported rows immediately.
+- `GET /v1/projects/{key}/rows/artifacts.zip?status=succeeded` streams a deflate-compressed zip named `{key}_{row_index:03d}_{slug}.{ext}`.
+- Limits: `BULK_IMPORT_MAX_ROWS=5000`, `BULK_IMPORT_MAX_BYTES=5_242_880`. 413 / 422 returned for over-size or unparseable uploads.
+- Frontend: "Import .txt / .csv" + "Download all .zip" actions in the script editor toolbar.
 
-- New endpoint `POST /v1/projects/{key}/script-rows/bulk` that accepts:
-  - `multipart/form-data` with a `.txt` (one line = one row) or `.csv` (configurable text column, optional `voice` and `speaker` columns) attachment.
-  - JSON option: paste raw text and split on newline / blank line / custom delimiter.
-- The endpoint inserts N `project_script_rows`, optionally enqueues all of them as jobs in one go, and returns a project-level batch ID for progress tracking.
-- Frontend: `ScriptEditor` gains a "Import" button (file picker + drag-drop). After import, a confirm modal shows the parsed rows and lets the user pick: assign one voice to all, or "use voice column from CSV".
-- Output naming convention: `{project_key}_{row_index:03d}_{sanitized_text_prefix}.{ext}` so files have a stable, sortable name.
-- A new "Download all (zip)" action on the project page when ≥ 2 jobs in the project are `succeeded`. The zip contains the audio files and (when subtitle generation lands — see #3) the matching subtitles.
-
-**Acceptance criteria.**
-
-- A user can drag a `.txt` with 50 lines, pick one voice, click Run, and end up with 50 audio files in the project artifacts.
-- A user can upload a CSV like `text,voice` and get one audio per row, with the per-row voice override applied.
-- Cancel works at two levels: cancel the whole batch (cancels all queued/running rows) and cancel a single row.
-- Per-row progress is visible (queued → running → succeeded/failed/canceled).
-
-**Risk and migration.** New endpoint; no breaking change to existing projects.
+Cancel-the-whole-batch and per-row cancel rely on existing per-row queue/cancel infrastructure (Epic 3). Speaker label propagation to subtitles is tracked under #3.
 
 ### 2. Multi-voice / dialogue mode
 

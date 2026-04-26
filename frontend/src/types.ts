@@ -189,6 +189,13 @@ export type ProjectMergeResponse = {
   artifact_kind: string;
 };
 
+export type BulkImportResponse = {
+  project_key: string;
+  inserted: number;
+  rows: ProjectScriptRow[];
+  queued_jobs: Job[];
+};
+
 export type HealthResponse = {
   status: string;
   providers: Record<

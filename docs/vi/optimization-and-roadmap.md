@@ -33,28 +33,16 @@ Mỗi mục:
 
 ## Tier 1 — Tính năng hướng người dùng
 
-### 1. Bulk import: TXT / CSV → batch project
+### 1. Bulk import: TXT / CSV → batch project — **đã ship**
 
-**Vì sao quan trọng.** Workflow phổ biến nhất là "tôi có một list câu, cho tôi một file audio mỗi câu." Hôm nay, mỗi dòng phải nhập tay trong `ScriptEditor`, từng dòng một. Đây là tính năng giá trị cao nhất danh sách.
+Triển khai trong `routes_project_rows.py` + `services_bulk_import.py` + `BulkImportDialog.tsx`.
 
-**Thay đổi gì.**
+- `POST /v1/projects/{key}/rows/bulk` (multipart): TXT split theo line / blank-line, CSV với `text_column` cấu hình được, các cột `voice_column`, `speaker_column`, `title_column` tùy chọn. `auto_enqueue=true` enqueue toàn bộ row vừa import.
+- `GET /v1/projects/{key}/rows/artifacts.zip?status=succeeded` stream zip nén deflate đặt tên `{key}_{row_index:03d}_{slug}.{ext}`.
+- Giới hạn: `BULK_IMPORT_MAX_ROWS=5000`, `BULK_IMPORT_MAX_BYTES=5_242_880`. Trả 413 / 422 cho upload quá lớn hoặc parse lỗi.
+- Frontend: nút "Nhập .txt / .csv" + "Tải tất cả .zip" trong toolbar script editor.
 
-- Endpoint mới `POST /v1/projects/{key}/script-rows/bulk` nhận:
-  - `multipart/form-data` với attachment `.txt` (mỗi dòng = 1 row) hoặc `.csv` (cột text cấu hình được, cột `voice` và `speaker` tùy chọn).
-  - Option JSON: paste text thô và split theo newline / dòng trắng / delimiter tùy chỉnh.
-- Endpoint insert N `project_script_rows`, tùy chọn enqueue tất cả thành job một loạt, và trả về batch ID cấp project để track tiến độ.
-- Frontend: `ScriptEditor` có nút "Import" (file picker + drag-drop). Sau import, modal xác nhận hiện các row đã parse và cho user chọn: gán một voice cho tất cả, hoặc "dùng cột voice từ CSV".
-- Convention đặt tên output: `{project_key}_{row_index:03d}_{sanitized_text_prefix}.{ext}` để file có tên ổn định và sortable.
-- Action mới "Download all (zip)" trên trang project khi ≥ 2 job trong project là `succeeded`. Zip chứa file audio và (khi subtitle land — xem #3) subtitle tương ứng.
-
-**Acceptance criteria.**
-
-- User kéo `.txt` 50 dòng, chọn 1 voice, click Run, và có 50 file audio trong artifact của project.
-- User upload CSV như `text,voice` và có 1 audio per row, với voice override per-row được áp dụng.
-- Cancel hoạt động ở 2 mức: cancel cả batch (cancel mọi row queued/running) và cancel 1 row.
-- Tiến độ per-row visible (queued → running → succeeded/failed/canceled).
-
-**Rủi ro và migration.** Endpoint mới; không breaking change cho project hiện hữu.
+Cancel cả batch và cancel từng row dùng hạ tầng queue/cancel có sẵn (Epic 3). Truyền speaker label sang subtitle theo dõi ở #3.
 
 ### 2. Multi-voice / dialogue mode
 

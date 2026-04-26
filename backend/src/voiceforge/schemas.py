@@ -156,7 +156,13 @@ class ProjectMergeResponse(BaseModel):
     merged_count: int
     output_format: str
     download_url: str
-    artifact_kind: str = "merged_audio"
+
+
+class BulkImportResponse(BaseModel):
+    project_key: str
+    inserted: int
+    rows: list[ProjectScriptRowResponse] = Field(default_factory=list)
+    queued_jobs: list["JobResponse"] = Field(default_factory=list)
 
 
 class CreateJobRequest(BaseModel):
