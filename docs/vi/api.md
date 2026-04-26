@@ -19,7 +19,7 @@ flowchart LR
   client([Client]) -->|/v1/jobs| api[FastAPI]
   client -->|/jobs<br/>legacy| api
   api --> handler[Handler]
-  api -. thêm Deprecation: true header .-> client_legacy
+  api -. thêm Deprecation: true header .-> client
 ```
 
 - Tất cả endpoint mới đặt dưới `/v1`. Mount legacy chia sẻ handler — chỉ là alias, không phải implementation song song.
@@ -75,6 +75,7 @@ Reference đầy đủ ở `/docs`. Dưới đây là model nhận thức dành 
 | `POST` | `/v1/jobs` | Tạo + enqueue. Trả `id` và `status=queued`. |
 | `GET` | `/v1/jobs` | List có phân trang. Query: `limit`, `offset`, `status`, `provider_key`, `project_key`, `q`. |
 | `GET` | `/v1/jobs/{id}` | Detail kèm artifact và event gần đây. |
+| `GET` | `/v1/jobs/{id}/artifact` | Stream file audio. |
 | `POST` | `/v1/jobs/{id}/cancel` | Cho phép khi `queued`/`running`. Worker re-check trước mỗi terminal write. |
 | `POST` | `/v1/jobs/{id}/retry` | Re-enqueue job `failed`/`canceled` với input gốc. |
 
@@ -85,12 +86,24 @@ Reference đầy đủ ở `/docs`. Dưới đây là model nhận thức dành 
 | `GET` | `/v1/projects` | List với stats. |
 | `POST` | `/v1/projects` | Tạo. |
 | `GET` | `/v1/projects/{key}` | Detail. |
-| `PATCH` | `/v1/projects/{key}` | Update name / description / default / tag. |
-| `POST` | `/v1/projects/{key}/archive` | Archive (soft delete; job giữ nguyên). |
-| `GET` | `/v1/projects/{key}/rows` | Row Script Editor. |
-| `PUT` | `/v1/projects/{key}/rows` | Replace row hàng loạt. |
-| `POST` | `/v1/projects/{key}/queue-rows` | Enqueue job cho row đã chọn. |
-| `POST` | `/v1/projects/{key}/merge` | Build master audio từ các row đã hoàn thành. |
+| `PATCH` | `/v1/projects/{key}` | Update name / description / default / tag / cờ archive. |
+| `GET` | `/v1/projects/{key}/merged-artifact` | Stream bản master mix-down của project. |
+| `GET` | `/v1/projects/{key}/export.zip` | T1.5 — tải bundle project (audio + script + voice-map + file gốc). |
+
+### Project script row
+
+Tất cả route mount dưới `/v1/projects/{key}/rows`.
+
+| Method | Path | Ghi chú |
+|---|---|---|
+| `GET` | `/v1/projects/{key}/rows` | Row Script Editor theo thứ tự hiển thị. |
+| `PUT` | `/v1/projects/{key}/rows` | Replace row hàng loạt (Script Editor save). |
+| `POST` | `/v1/projects/{key}/rows/queue` | Enqueue job cho row đã chọn (trước là `/queue-rows`). |
+| `POST` | `/v1/projects/{key}/rows/merge` | Build master audio từ các row đã hoàn thành (trước là `/merge`). |
+| `POST` | `/v1/projects/{key}/rows/bulk` | T1.1 — bulk import từ `multipart/form-data` (`file=*.txt\|*.csv`). |
+| `GET` | `/v1/projects/{key}/rows/artifacts.zip` | T1.1 — tải toàn bộ artifact các row đã hoàn thành dưới dạng zip. |
+| `GET` | `/v1/projects/{key}/rows/subtitles` | T1.3 — tải `.srt` hoặc `.vtt` cho project. Query: `format=srt\|vtt`, `silence_ms`, `only_completed`. |
+| `GET` | `/v1/projects/{key}/rows/{row_id}/artifact` | Stream audio của 1 row. |
 
 ### Catalog
 
@@ -98,15 +111,41 @@ Reference đầy đủ ở `/docs`. Dưới đây là model nhận thức dành 
 |---|---|---|
 | `GET` | `/v1/catalog/voices` | Voice mọi provider, có phân trang. |
 | `GET` | `/v1/catalog/voices/search` | Search server-side theo query, language, locale. |
-| `POST` | `/v1/catalog/refresh` | Trigger refresh catalog ở background. |
+
+### Provider
+
+| Method | Path | Ghi chú |
+|---|---|---|
+| `GET` | `/v1/providers` | Tóm tắt provider (status, voice sẵn, capability). |
+| `GET` | `/v1/providers/{key}/voices` | Voice của 1 provider. |
+| `GET` | `/v1/providers/{key}/voices/{voice_id}/preview` | Stream sample voice từ catalog. |
+| `POST` | `/v1/providers/{key}/preview` | T1.4 — synthesize 1 đoạn text ad-hoc, không enqueue job. |
 
 ### Settings
 
 | Method | Path | Ghi chú |
 |---|---|---|
-| `GET` | `/v1/settings/{namespace}` | Đọc setting. Secret bị mask. |
-| `PUT` | `/v1/settings/{namespace}/{key}` | Upsert. Encrypt khi `is_secret=true` và `APP_ENCRYPTION_KEY` set. |
-| `GET` | `/v1/settings/schemas` | Schema tham số per-provider. |
+| `GET` | `/v1/settings` | Tổng quan: credential redact, schema voice-parameter, merge default. |
+| `GET` | `/v1/settings/provider-credentials` | List credential provider đã redact. |
+| `PUT` | `/v1/settings/provider-credentials/{provider_key}` | Upsert. Encrypt bằng Fernet khi `APP_ENCRYPTION_KEY` set. |
+| `GET` | `/v1/settings/voice-parameter-schemas` | Schema tham số của mọi provider. |
+| `GET` | `/v1/settings/voice-parameter-schemas/{provider_key}` | Schema của 1 provider. |
+| `PATCH` | `/v1/settings/merge-defaults` | Cập nhật default merge format/silence/... |
+
+### System và admin
+
+| Method | Path | Ghi chú |
+|---|---|---|
+| `GET` | `/v1/system/capabilities` | T2.6 — host probe (CPU count, GPU presence, NVML data, memory). |
+| `GET` | `/v1/admin/retention/preview` | T3.10 — dry-run: purge sẽ xóa bao nhiêu job/artifact. |
+| `POST` | `/v1/admin/retention/purge` | T3.10 — thực sự xóa job cũ hơn threshold. |
+
+### Real-time và event
+
+| Method | Path | Ghi chú |
+|---|---|---|
+| `GET` | `/v1/events/snapshot` | Snapshot 1-lần state hiện tại (jobs + projects + event gần đây). |
+| `GET` | `/v1/events/stream` | Stream Server-Sent Events (snapshot + heartbeat). |
 
 ### Health và monitor
 
@@ -114,6 +153,7 @@ Reference đầy đủ ở `/docs`. Dưới đây là model nhận thức dành 
 |---|---|---|
 | `GET` | `/health` | Liveness/readiness. Bao gồm reachability provider. **Không auth.** |
 | `GET` | `/v1/monitor/status` | Health provider tổng + số job đang chạy. |
+| `GET` | `/v1/monitor/log-sources` | Danh sách log source khả dụng. |
 | `GET` | `/v1/monitor/logs?source=api\|worker\|<engine>` | Tail log. Source engine chỉ khả dụng khi mount Docker socket. |
 | `GET` | `/metrics` | Prometheus exposition. Không auth; restrict ở proxy. |
 

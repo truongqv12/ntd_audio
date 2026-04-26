@@ -47,14 +47,24 @@ flowchart TB
   e4 --> e4e[Rate limit]
   e4 --> e4f[Prometheus /metrics]
 
-  nx --> nx1[ArtifactStorage wiring into write_artifact]
-  nx --> nx2[JWT / multi-user auth]
-  nx --> nx3[Worker scaling + DLQ]
-  nx --> nx4[E2E tests]
-  nx --> nx5[Provider plugin system]
-  nx --> nx6[Helm chart]
-  nx --> nx7[Telemetry opt-in]
-  nx --> nx8[Artifact GC]
+  root --> personal[Personal-use roadmap<br/>T1–T3]
+  personal --> p1[T1.1 Bulk import TXT/CSV]
+  personal --> p2[T1.2 Multi-voice / dialogue]
+  personal --> p3[T1.3 Subtitle .srt/.vtt]
+  personal --> p4[T1.4 Inline preview]
+  personal --> p5[T1.5 Project export bundle]
+  personal --> p6[T2.6 GPU/CPU auto-detect]
+  personal --> p7[T2.7 Per-provider concurrency]
+  personal --> p8[T2.8 ArtifactStorage wired]
+  personal --> p9[T3.9 Provider plugin entry points]
+  personal --> p10[T3.10 Retention preview/purge]
+  personal --> p11[T3.11 Playwright smoke harness]
+
+  nx --> nx1[Conversation-mode multi-voice UX]
+  nx --> nx2[S3 read path / presigned URL]
+  nx --> nx3[Subtitle import + bundle in export.zip]
+  nx --> nx4[Per-engine device telemetry]
+  nx --> nx5[Settings-persisted concurrency overrides]
 ```
 
 ## Epic 1 — Operational safety
@@ -112,51 +122,39 @@ flowchart TB
 | Token-bucket rate limiter | ✅ | `backend/src/voiceforge/rate_limit.py` |
 | Prometheus `/metrics` with single-subscriber metric pipeline | ✅ | `backend/src/voiceforge/observability.py`, `main.py::_metrics_subscriber` |
 | In-flight gauge seeded from DB + clamped to ≥ 0 | ✅ | `main.py::lifespan`, `observability.py::record_job_event` |
-| T2.6 — Host capability probe (`GET /v1/system/capabilities`) | ✅ | `services_system.py`, `routes_system.py`, Settings → Host panel |
-| T2.8 — `write_artifact` flows through `ArtifactStorage` | ✅ | `storage.py::write_artifact`, `services/storage.py::get_storage` |
-| T3.10 — Retention preview/purge (`/v1/admin/retention/{preview,purge}`) | ✅ | `backend/src/voiceforge/services_retention.py`, `routes_retention.py` |
-| T3.9 — Provider plugin entry points (`voiceforge.providers` group) | ✅ | `backend/src/voiceforge/provider_registry.py` |
-| T3.11 — Playwright smoke harness (`npm run test:e2e`) | ✅ | `frontend/playwright.config.ts`, `frontend/e2e/smoke.spec.ts` |
-| T1.5 — Project export bundle (`GET /v1/projects/{key}/export.zip`) | ✅ | `services_project_export.py`, `routes_projects.py` |
 
-## Personal-use roadmap (T1+)
+## Personal-use roadmap (T1–T3)
+
+All items below were added on top of Epic 4 to better fit the **single-user, single-host Docker** deployment shape. See [`optimization-and-roadmap.md`](optimization-and-roadmap.md) for the original acceptance criteria and migration notes.
 
 | Feature | Status | Where |
 |---|---|---|
 | T1.1 — Bulk import TXT/CSV (`POST /v1/projects/{key}/rows/bulk`) | ✅ | `routes_project_rows.py`, `services_bulk_import.py` |
 | T1.1 — Project artifacts zip (`GET /v1/projects/{key}/rows/artifacts.zip`) | ✅ | `routes_project_rows.py::download_artifacts_zip` |
 | T1.1 — `BulkImportDialog` modal in the script editor | ✅ | `frontend/src/components/BulkImportDialog.tsx` |
-| T1.4 — On-demand single-row preview (`POST /v1/providers/{key}/preview`) | ✅ | `routes_providers.py::preview_arbitrary_text` |
-
-
-## Personal-use roadmap (T1+)
-
-| Feature | Status | Where |
-|---|---|---|
-| T2.7 — Per-provider concurrency limit (`PROVIDER_CONCURRENCY`) | ✅ | `services_provider_concurrency.py`, `services_jobs.process_job` |
-
-## Personal-use roadmap (T1+)
-
-| Feature | Status | Where |
-|---|---|---|
 | T1.2 — `speaker_label` on script rows (dialogue mode minimum) | ✅ | `models.ProjectScriptRow.speaker_label`, alembic `20260424_0004` |
-| T1.3 — Subtitle download (`.srt` / `.vtt`) | ✅ | `services_subtitles.py`, `routes_project_rows.download_project_subtitles` |
+| T1.3 — Subtitle output `.srt` / `.vtt` (`GET /v1/projects/{key}/rows/subtitles`) | ✅ | `services_subtitles.py`, `routes_project_rows.download_project_subtitles` |
+| T1.4 — On-demand single-row preview (`POST /v1/providers/{key}/preview`) | ✅ | `routes_providers.py::preview_arbitrary_text` |
+| T1.5 — Project export bundle (`GET /v1/projects/{key}/export.zip`) | ✅ | `services_project_export.py`, `routes_projects.py` |
+| T2.6 — Host capability probe (`GET /v1/system/capabilities`) | ✅ | `services_system.py`, `routes_system.py`, Settings → Host panel |
+| T2.7 — Per-provider concurrency limit (`PROVIDER_CONCURRENCY`) | ✅ | `services_provider_concurrency.py`, `services_jobs.process_job` |
+| T2.8 — `write_artifact` flows through `ArtifactStorage` | ✅ | `storage.py::write_artifact`, `services/storage.py::get_storage` |
+| T3.9 — Provider plugin entry points (`voiceforge.providers` group) | ✅ | `backend/src/voiceforge/provider_registry.py` |
+| T3.10 — Retention preview/purge (`/v1/admin/retention/{preview,purge}`) | ✅ | `backend/src/voiceforge/services_retention.py`, `routes_retention.py` |
+| T3.11 — Playwright smoke harness (`npm run test:e2e`) | ✅ | `frontend/playwright.config.ts`, `frontend/e2e/smoke.spec.ts` |
 
-## Roadmap
+## Roadmap (open backlog)
 
-For the full rationale, acceptance criteria, and migration notes for each item, see [`optimization-and-roadmap.md`](optimization-and-roadmap.md). The table below is a short index.
+For the full rationale, acceptance criteria, and migration notes for each item, see [`optimization-and-roadmap.md`](optimization-and-roadmap.md). The table below is a short index of work that has **not** been done yet.
 
-These are not committed — order is suggestion based on impact, not a guarantee. Vote on issues for ones that matter to your install.
+These are not committed — order is suggestion based on impact, not a guarantee. Multi-user / SaaS items (JWT auth, Helm, telemetry, worker DLQ) are intentionally excluded from this list — see the "Out of scope" section in `optimization-and-roadmap.md`.
 
 | Item | Why |
 |---|---|
-| **Wire `ArtifactStorage` into `write_artifact`** | The Protocol exists, but the legacy write path still touches the local FS directly. Operators set `STORAGE_BACKEND=s3` today and get a no-op. |
-| **JWT / multi-user auth** | Current API-key gate is single-tenant. Multi-user installs need user accounts, sessions, and per-user audit. |
-| **Worker scaling primitives** | Priority queues, dead-letter, per-project concurrency caps, drain-on-deploy. |
-| **End-to-end tests** | A Playwright smoke suite that walks the create-job → wait → download flow on a real Compose stack. |
-| **Provider plugin system** | Today, adding a provider requires editing the registry. A plugin loader (entry points) lets users ship their own without forking. |
-| **Helm chart** | First-class Kubernetes deploy story. The Compose stack maps directly. |
-| **Anonymous telemetry (opt-in)** | "How many installs run which engine" — feeds prioritization. Strict opt-in only. |
-| **Artifact garbage collection** | Old artifacts and their cache rows accumulate. A configurable retention policy job. |
+| **Conversation-mode multi-voice UX** | Speaker label is just a string today. A heavier panel mapping `speaker_label → provider_voice_id` with auto-fill on new rows is deferred. |
+| **S3 read path / presigned URL** | T2.8 wired the **write** path through `ArtifactStorage`. Reads (`artifact_absolute_path` + `FileResponse`) are still local-fs only. |
+| **Subtitle import + bundle in export.zip** | T1.5 export bundle does not yet include `subtitles/` or the original imported TXT/CSV. Companion `POST /v1/projects/import` is the natural follow-up. |
+| **Per-engine device telemetry** | Today `/v1/system/capabilities` reports what the **API** container sees. Reporting which device each engine actually loaded on (CPU vs CUDA) is an open extension. |
+| **Settings-persisted concurrency overrides** | T2.7 limits are env-driven. A Settings → "Performance" panel that persists overrides in `app_settings` would avoid an env reload. |
 | **i18n: more locales** | JP / ZH / KR are likely first asks given the engines we ship. |
 | **Frontend test coverage** | The smoke suite is intentionally small. Critical paths (job creation, settings, ScriptEditor) deserve component-level coverage. |

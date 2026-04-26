@@ -96,6 +96,7 @@ erDiagram
     json params
     bool enabled
     bool join_to_master
+    string speaker_label
   }
 ```
 
@@ -149,7 +150,7 @@ Lookup table that lets two identical jobs (same text, voice, params, output form
 
 ### `project_script_rows`
 
-Per-project ordered rows for the Script Editor workflow. Each row has its own text, optional per-row voice/provider override, params, enable flag, and join-to-master flag.
+Per-project ordered rows for the Script Editor workflow. Each row has its own text, optional per-row voice/provider override, params, enable flag, join-to-master flag, and an optional `speaker_label` (free-text dialogue tag, max 80 chars; added in alembic `20260424_0004`). The label is consumed by `services_subtitles.py` to prefix subtitle cues with `[Speaker]`.
 
 Indexes: `project_id`, `row_index`.
 

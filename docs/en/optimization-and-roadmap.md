@@ -88,7 +88,7 @@ Implemented in `routes_providers.py::preview_arbitrary_text` + `previewRowSynthe
 
 The merge panel exposes an "Export project (.zip)" button next to "Merge completed".
 
-`subtitles/` and the original imported TXT/CSV are still on the wishlist (they depend on T1.3 / T1.1 changes that haven't merged yet) and will be added when those land. The companion `POST /v1/projects/import` is the natural follow-up — `script.json` already encodes everything needed for a round-trip recreate.
+Bundling `subtitles/` (now that T1.3 has shipped) and the originally imported TXT/CSV into the export zip is still on the wishlist — a small follow-up, since the underlying generators already exist. The companion `POST /v1/projects/import` is the natural next step — `script.json` already encodes everything needed for a round-trip recreate.
 
 ---
 

@@ -211,5 +211,4 @@ These are intentional gaps; see [`feature-map.md`](feature-map.md) for status:
 
 - **Multi-user auth.** Currently a shared `APP_API_KEYS` CSV gates the API; there is no user model or workspace isolation.
 - **Worker scaling.** Dramatiq supports multiple worker replicas, but priority queues, dead-letter handling, and per-project concurrency caps are not yet implemented.
-- **Storage GC.** Old artifacts are not pruned automatically.
 - **Telemetry.** No anonymous usage stats are collected.
