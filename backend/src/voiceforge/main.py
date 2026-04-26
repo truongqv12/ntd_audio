@@ -6,13 +6,18 @@ import time
 from contextlib import asynccontextmanager
 from uuid import uuid4
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy import func, select
 
-from .api_router import api_router
+from .api_router import build_api_router
 from .config import settings
 from .db import SessionLocal, init_db
+from .enums import JobStatus
+from .events_bus import subscribe_jobs_changed
 from .logging_setup import setup_logging
+from .models import SynthesisJob
+from .observability import record_http, record_job_event, render_metrics, seed_jobs_in_flight
 from .services_catalog import refresh_catalog
 from .services_jobs import reap_stale_jobs
 from .services_projects import ensure_project
@@ -42,6 +47,31 @@ def _reap_stale_jobs_safe() -> None:
         db.close()
 
 
+async def _metrics_subscriber() -> None:
+    """Single API-side consumer that translates Redis events into Prometheus metrics.
+
+    The API and the Dramatiq worker each own their own ``REGISTRY``. ``/metrics``
+    is served from the API, so worker-side ``record_job_event`` calls would be
+    invisible. Instead, every publisher just writes to the Redis channel and the
+    API alone updates metrics from the messages it reads here. If Redis is
+    unreachable the upstream subscribe loop only yields heartbeats, which we
+    skip — metrics stall during the outage but never drift.
+    """
+    while True:
+        try:
+            async for msg in subscribe_jobs_changed(heartbeat_seconds=30.0):
+                reason = msg.get("reason")
+                if not reason or reason == "heartbeat":
+                    continue
+                payload = msg.get("payload") or {}
+                record_job_event(reason, payload.get("provider_key"))
+        except asyncio.CancelledError:
+            raise
+        except Exception as exc:
+            logger.warning("metrics_subscriber_error err=%s", exc)
+            await asyncio.sleep(2.0)
+
+
 async def _run_periodic(coro_func, interval_seconds: int, task_name: str) -> None:
     while True:
         try:
@@ -60,6 +90,19 @@ async def lifespan(_app: FastAPI):
     db = SessionLocal()
     try:
         ensure_project(db)
+        # Seed the in-flight gauge from the DB so a process restart doesn't
+        # leave it at 0 while queued/running jobs still exist — that would
+        # cause subsequent terminal events to drift the gauge negative.
+        if settings.metrics_enabled:
+            inflight = (
+                db.scalar(
+                    select(func.count(SynthesisJob.id)).where(
+                        SynthesisJob.status.in_((JobStatus.queued.value, JobStatus.running.value))
+                    )
+                )
+                or 0
+            )
+            seed_jobs_in_flight(int(inflight))
     finally:
         db.close()
 
@@ -74,6 +117,11 @@ async def lifespan(_app: FastAPI):
                 _run_periodic(_reap_stale_jobs_safe, settings.job_reaper_interval_seconds, "reaper"),
                 name="stale-job-reaper",
             )
+        )
+
+    if settings.metrics_enabled:
+        background_tasks.append(
+            asyncio.create_task(_metrics_subscriber(), name="metrics-subscriber"),
         )
 
     logger.info(
@@ -107,7 +155,10 @@ app.add_middleware(
     expose_headers=["X-App-Version", "X-Request-Id"],
 )
 
-app.include_router(api_router)
+# Versioned mount is the canonical surface; the un-versioned mount stays for
+# backward-compat with existing clients and is marked deprecated via a header.
+app.include_router(build_api_router(), prefix="/v1")
+app.include_router(build_api_router())
 
 
 @app.middleware("http")
@@ -118,6 +169,13 @@ async def request_logging_middleware(request: Request, call_next):
     elapsed_ms = round((time.perf_counter() - started) * 1000, 2)
     response.headers["x-request-id"] = request_id
     response.headers["x-app-version"] = settings.app_version
+    if settings.metrics_enabled:
+        # Use the matched route's path template so metrics labels are bounded.
+        # Unmatched URLs (404s, scanners) collapse to a single timeseries to
+        # prevent a cardinality-explosion DoS.
+        route = request.scope.get("route")
+        path_template = getattr(route, "path", None) or "__unmatched__"
+        record_http(request.method, path_template, response.status_code, elapsed_ms / 1000.0)
     logger.info(
         "http_request request_id=%s method=%s path=%s status=%s duration_ms=%s",
         request_id,
@@ -132,3 +190,11 @@ async def request_logging_middleware(request: Request, call_next):
 @app.get("/")
 def root() -> dict:
     return {"app": settings.app_name, "status": "ready", "version": settings.app_version}
+
+
+@app.get("/metrics", include_in_schema=False)
+def metrics() -> Response:
+    if not settings.metrics_enabled:
+        return Response(status_code=404)
+    body, content_type = render_metrics()
+    return Response(content=body, media_type=content_type)

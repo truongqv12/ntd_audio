@@ -1,0 +1,111 @@
+version: "3.9"
+
+# Production overlay. Use:
+#
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+#
+# Layers on top of the base compose:
+# - removes host port bindings for postgres/redis (only api/frontend are public)
+# - adds restart policies, resource limits, and structured logging
+# - drops the docker socket mount on the api container (security)
+# - serves the built frontend bundle from nginx on port 80
+
+services:
+  postgres:
+    restart: unless-stopped
+    # Compose appends ports lists on merge — use !reset (Compose v2.24+) so the
+    # base "5432:5432" host binding is actually removed in production.
+    ports: !reset []
+    deploy:
+      resources:
+        limits:
+          memory: 1g
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+
+  redis:
+    restart: unless-stopped
+    # See note on postgres above — ports list is appended, not replaced.
+    ports: !reset []
+    command: ["redis-server", "--appendonly", "yes", "--save", "60", "1000"]
+    volumes:
+      - redis-data:/data
+    deploy:
+      resources:
+        limits:
+          memory: 512m
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+
+  voicevox:
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 2g
+
+  migrate:
+    restart: "no"
+
+  api:
+    restart: unless-stopped
+    environment:
+      APP_ENV: production
+      METRICS_ENABLED: "true"
+      RATE_LIMIT_PER_MINUTE: ${RATE_LIMIT_PER_MINUTE:-120}
+      MONITOR_CONTAINER_LOGS_ENABLED: "false"
+    # Production drops the docker socket. Compose merges volumes by mount-point
+    # rather than replacing the list, so we explicitly mask /var/run/docker.sock
+    # with /dev/null instead of just omitting it from the overlay.
+    volumes:
+      - artifacts-data:/data/artifacts
+      - cache-data:/data/cache
+      - logs-data:/data/logs
+      - /dev/null:/var/run/docker.sock:ro
+    deploy:
+      resources:
+        limits:
+          memory: 1g
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "10"
+
+  worker:
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 1g
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "10"
+
+  frontend:
+    restart: unless-stopped
+    build:
+      context: ./frontend
+      args:
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-/api/v1}
+    ports:
+      - "${FRONTEND_PORT:-80}:80"
+    depends_on:
+      api:
+        condition: service_healthy
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+
+volumes:
+  redis-data:
