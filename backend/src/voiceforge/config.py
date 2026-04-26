@@ -71,6 +71,8 @@ class Settings(BaseSettings):
     voice_catalog_refresh_on_start: bool = Field(default=True, alias="VOICE_CATALOG_REFRESH_ON_START")
     voice_catalog_refresh_timeout_seconds: float = Field(default=8.0, alias="VOICE_CATALOG_REFRESH_TIMEOUT_SECONDS")
 
+    subtitle_chars_per_second: float = Field(default=15.0, alias="SUBTITLE_CHARS_PER_SECOND")
+
     job_max_runtime_seconds: int = Field(default=900, alias="JOB_MAX_RUNTIME_SECONDS")
     job_reaper_interval_seconds: int = Field(default=60, alias="JOB_REAPER_INTERVAL_SECONDS")
     job_reaper_enabled: bool = Field(default=True, alias="JOB_REAPER_ENABLED")

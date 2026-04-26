@@ -2,6 +2,7 @@ import { memo, useCallback, useEffect, useMemo, useState } from "react";
 import {
   artifactUrl,
   downloadProjectArtifactsZip,
+  downloadProjectSubtitles,
   fetchProjectRows,
   mergeProjectRows,
   previewRowSynthesis,
@@ -106,6 +107,8 @@ const COPY: Record<Locale, Record<string, string>> = {
     saveError: "Unable to save project rows",
     queueError: "Unable to queue rows",
     mergeError: "Unable to merge rows",
+    downloadSubtitles: "Download subtitles",
+    subtitlesError: "Unable to download subtitles",
     reorderUp: "Move up",
     reorderDown: "Move down",
   },
@@ -167,6 +170,8 @@ const COPY: Record<Locale, Record<string, string>> = {
     saveError: "Không lưu được dòng project",
     queueError: "Không queue được dòng",
     mergeError: "Không nối được audio",
+    downloadSubtitles: "Tải subtitle",
+    subtitlesError: "Không tải được subtitle",
     reorderUp: "Đưa lên",
     reorderDown: "Đưa xuống",
   },
@@ -603,6 +608,26 @@ export const ScriptEditorPage = memo(function ScriptEditorPage({
     selectedIds,
   ]);
 
+  const downloadSubtitles = useCallback(
+    async (fileFormat: "srt" | "vtt") => {
+      try {
+        setError(null);
+        const blob = await downloadProjectSubtitles(activeProjectKey, fileFormat, mergeSilenceMs);
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = `${activeProjectKey}.${fileFormat}`;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        URL.revokeObjectURL(url);
+      } catch {
+        setError(copy.subtitlesError);
+      }
+    },
+    [activeProjectKey, copy.subtitlesError, mergeSilenceMs],
+  );
+
   const handleVoiceSelected = useCallback(
     (voice: VoiceCatalogEntry) => {
       if (!pickerTarget) return;
@@ -1022,6 +1047,20 @@ export const ScriptEditorPage = memo(function ScriptEditorPage({
             <div className="script-action-column">
               <button type="button" className="primary-button" onClick={() => void mergeRows()}>
                 {copy.mergeCompleted}
+              </button>
+              <button
+                type="button"
+                className="ghost-button compact-button"
+                onClick={() => void downloadSubtitles("srt")}
+              >
+                {copy.downloadSubtitles} (.srt)
+              </button>
+              <button
+                type="button"
+                className="ghost-button compact-button"
+                onClick={() => void downloadSubtitles("vtt")}
+              >
+                {copy.downloadSubtitles} (.vtt)
               </button>
             </div>
             {masterArtifactUrl ? (

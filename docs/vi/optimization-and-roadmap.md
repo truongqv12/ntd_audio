@@ -56,26 +56,17 @@ Concat thành 1 mixdown conversation đã có sẵn (`merge_project_rows` + ffmp
 
 Panel "Speakers" map `speaker_label → provider_voice_id` và auto-fill voice cho row mới đang cố ý hoãn. Với personal-use script một lần, set tay voice + speaker per row vẫn ổn; revisit nếu thấy bất tiện thật.
 
-### 3. Subtitle output (.srt / .vtt)
+### 3. Subtitle output (.srt / .vtt) — **đã ship**
 
-**Vì sao quan trọng.** Cho creator video (đối tượng tự nhiên của workflow TTS này), file audio đơn lẻ chỉ là một nửa asset. Họ muốn 1 subtitle file đồng bộ per row hoặc per conversation, với speaker label tùy chọn cho dialogue.
+Triển khai trong `services_subtitles.py`, expose tại `GET /v1/projects/{key}/rows/subtitles?format=srt|vtt&silence_ms=150&only_completed=true`.
 
-**Thay đổi gì.**
+- Cue duration lấy từ `row.duration_seconds` khi có (worker set sau job thành công). Row không có duration fallback `len(text) / SUBTITLE_CHARS_PER_SECOND` (default `15`, set qua env).
+- Timeline monotonic: mỗi cue bắt đầu từ chỗ cue trước kết thúc, plus tuỳ chọn `silence_ms` gap (default theo project merge silence).
+- Khi row có `speaker_label`, text cue prefix `[Anna] Hello there.`.
+- 2 nút ghost trong panel merge của script editor trigger download `.srt` / `.vtt`.
+- 8 pytest case cover format timestamp, fallback duration, prefix speaker, và shape body SRT/VTT.
 
-- Artifact kind mới: `subtitle` (extension `.srt`; `.vtt` qua query param khi download).
-- Cho engine emit timing info (một số cloud provider expose timestamp cấp phoneme hoặc câu), dùng timing đó trực tiếp.
-- Cho engine không có, ước lượng timing từ `audio_duration_ms` và `char_count` (uniform char/s trong row, sentence break align với punctuation).
-- Cho output mode "Conversation", subtitle là 1 `.srt` ghép cover toàn mixdown, mỗi row 1 cue và speaker label (nếu có) làm prefix (`[Anna] Hello there.`).
-- Frontend: download subtitle xuất hiện cạnh download audio trên trang project.
-
-**Acceptance criteria.**
-
-- Sau job thành công, download subtitle trả SRT hợp lệ (verify với thư viện `srt`).
-- Mode conversation tạo 1 SRT ghép; mode stems tạo 1 SRT per row.
-- Cho engine emit timestamp thật (vd Google Cloud TTS markup mode), boundary cue SRT match audio thực tế nói (trong dung sai nhỏ).
-- Cho engine không có timing info, SRT ít nhất monotonic và tổng duration match audio file.
-
-**Rủi ro và migration.** Thuần addition. Artifact kind mới cần migration enum nhưng không destructive.
+Word-level timing trong row (vd consume timestamp phoneme từ Google Cloud TTS) cố ý out of scope. Estimator "đủ tốt" cho video personal-use; consumer cần timing chuẩn frame có thể post-process bằng NLE riêng.
 
 ### 4. Inline preview 1 row — **đã ship**
 

@@ -3,10 +3,14 @@ from typing import Literal
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse, StreamingResponse
+from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi.responses import FileResponse, Response
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from .config import settings
 from .db import get_db
+from .models import Project, ProjectScriptRow
 from .schemas import (
     BulkImportResponse,
     ProjectBatchQueueResponse,
@@ -26,6 +30,7 @@ from .services_project_rows import (
     replace_project_rows,
     stream_artifacts_zip,
 )
+from .services_subtitles import render as render_subtitles
 from .tasks import run_synthesis_job
 
 router = APIRouter(prefix="/projects/{project_key}/rows", tags=["project-rows"])
@@ -148,6 +153,39 @@ def download_artifacts_zip(
         raise HTTPException(status_code=404, detail="Project not found")
     headers = {"Content-Disposition": f'attachment; filename="{project_key}-artifacts.zip"'}
     return StreamingResponse(chunks, media_type="application/zip", headers=headers)
+
+
+@router.get("/subtitles")
+def download_project_subtitles(
+    project_key: str,
+    db: Session = Depends(get_db),
+    file_format: str = Query("srt", alias="format", pattern="^(srt|vtt)$"),
+    silence_ms: int = Query(150, ge=0, le=10000),
+    only_completed: bool = Query(True),
+) -> Response:
+    project = db.scalar(select(Project).where(Project.project_key == project_key))
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+    stmt = (
+        select(ProjectScriptRow)
+        .where(
+            ProjectScriptRow.project_id == project.id,
+            ProjectScriptRow.is_enabled.is_(True),
+        )
+        .order_by(ProjectScriptRow.row_index.asc())
+    )
+    if only_completed:
+        stmt = stmt.where(ProjectScriptRow.last_artifact_relative_path.is_not(None))
+    rows = list(db.scalars(stmt).all())
+    if not rows:
+        raise HTTPException(status_code=404, detail="No rows available for subtitles")
+    body, mime = render_subtitles(rows, file_format=file_format, silence_ms=silence_ms)
+    filename = f"{project_key}.{file_format}"
+    return Response(
+        content=body,
+        media_type=mime,
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
 
 
 @router.get("/{row_id}/artifact")
