@@ -1,269 +1,94 @@
-# VoiceForge Studio
+# ntd_audio
 
-VoiceForge Studio là codebase cho **voice generation / TTS orchestration** theo hướng:
+> [Tiếng Việt](README.vi.md) · English
 
-- **PostgreSQL-first**
-- **FastAPI + worker + Redis**
-- UI quản lý job/provider/project
-- Hỗ trợ cả **cloud TTS** và **open-source/self-hosted TTS runtimes thật**
-- Có **SSE stream** để frontend tự cập nhật, không cần F5 liên tục
+A self-host-first **TTS orchestration platform**: queue voice synthesis jobs across multiple engines (cloud and open-source), monitor them in a live dashboard, and assemble the resulting audio into project-level masters.
 
-## Bản cập nhật này tập trung vào gì
+> **For AI agents:** open [`AGENTS.md`](AGENTS.md). It defines the invariants you must respect.
+>
+> **For humans:** the [Quickstart](#quickstart) gets you running in under 5 minutes. Deeper docs are under [`docs/en/`](docs/en/).
 
-Phần khó nhất của codebase trước là các engine open-source vẫn ở mức adapter/placeholder. Bản này chuyển 3 engine sang **runtime thật**:
+## Why ntd_audio
 
-- **Piper** runtime thật bằng `piper-tts` + tải voice models bằng `python -m piper.download_voices`  
-- **Kokoro** runtime thật bằng official `kokoro` Python library và `KPipeline`  
-- **VieNeu-TTS** runtime thật bằng official `vieneu` SDK ở chế độ local/turbo  
+- **Multi-engine in one place.** Cloud (OpenAI, ElevenLabs, Google Cloud TTS, Azure Speech) and open-source (VOICEVOX, Piper, Kokoro, VieNeu-TTS) behind one queue, one API, one UI.
+- **Project-centric.** Jobs, voices, defaults, and assembled masters all hang off a `project`. Switching engines doesn't fragment your work.
+- **Real-time UI.** SSE pushes job state changes sub-second; no manual refresh.
+- **Self-host without PaaS.** One Docker Compose command. Postgres + Redis included. Production overlay strips host port bindings and the Docker socket.
+- **Operational defaults.** Migrations gate the API. Healthchecks, stale-job reaper, rate limit, Prometheus metrics, encryption-at-rest for provider secrets, and structured logs all ship in the box.
 
-Ngoài ra vẫn giữ:
-- **VOICEVOX** self-hosted engine thật
-- các cloud adapters: OpenAI / ElevenLabs / Google / Azure
+## Architecture at a glance
 
-## Cấu trúc runtime
-
-```text
-frontend (React/Vite)
-api (FastAPI)
-worker (Dramatiq)
-postgres
-redis
-voicevox
-piper-runtime
-kokoro-runtime
-vieneu-runtime
+```mermaid
+flowchart LR
+  user(["User / API client"]) --> nginx[nginx<br/>SPA + reverse proxy]
+  nginx --> api[FastAPI<br/>:8000]
+  api --> pg[(PostgreSQL)]
+  api --> redis[(Redis<br/>queue + pub/sub)]
+  redis --> worker[Dramatiq<br/>worker]
+  worker --> pg
+  worker --> engines[Engines<br/>VOICEVOX · Piper · Kokoro · VieNeu · Cloud APIs]
+  worker --> storage[(Artifact storage<br/>local FS or S3)]
+  api -. SSE .-> nginx
 ```
 
-## Các engine open-source đã tích hợp thật
+Full topology and sequence diagrams: [`docs/en/architecture.md`](docs/en/architecture.md).
 
-### 1) VOICEVOX
-Dùng image engine chính thức của VOICEVOX.
-
-### 2) Piper
-- runtime riêng tại `engines/piper-runtime`
-- dùng package `piper-tts`
-- có thể auto-download voices khi service khởi động
-- hiện compose mặc định gợi ý các voice:
-  - `vi_VN-vais1000-medium`
-  - `en_US-lessac-medium`
-  - `en_GB-alan-medium`
-
-### 3) Kokoro
-- runtime riêng tại `engines/kokoro-runtime`
-- dùng package `kokoro`
-- synthesize thật qua `KPipeline`
-- hỗ trợ nhóm voices English và một số locale khác theo model/voice set Kokoro
-
-### 4) VieNeu-TTS
-- runtime riêng tại `engines/vieneu-runtime`
-- dùng package `vieneu`
-- chạy local Turbo mode để ưu tiên deployment thực tế cho CPU/local trước
-- dùng preset voices từ SDK và synthesize thật
-
-## Chạy stack cơ bản
+## Quickstart
 
 ```bash
+git clone https://github.com/truongqv12/ntd_audio
+cd ntd_audio
 cp .env.example .env
 docker compose up --build
 ```
 
-Services mặc định:
-- frontend: `http://localhost:5173`
-- api: `http://localhost:8000`
-- docs: `http://localhost:8000/docs`
-- postgres: `localhost:5432`
+- Frontend: <http://localhost:5173>
+- API: <http://localhost:8000> · Swagger UI: <http://localhost:8000/docs>
+- Health: <http://localhost:8000/health>
 
-## Chạy kèm tất cả OSS runtimes
+The default stack runs `migrate → api + worker → frontend` against bundled Postgres and Redis. To bring up an OSS engine alongside, use one of the Compose overlays:
 
 ```bash
+# Run all OSS engines (VOICEVOX + Piper + Kokoro + VieNeu)
 docker compose -f docker-compose.yml -f docker-compose.oss.yml up --build
-```
 
-## Chạy từng runtime riêng
-
-### Piper
-```bash
+# Or one engine at a time
 docker compose -f docker-compose.yml -f docker-compose.piper.yml up --build
-```
-
-### Kokoro
-```bash
 docker compose -f docker-compose.yml -f docker-compose.kokoro.yml up --build
-```
-
-### VieNeu-TTS
-```bash
 docker compose -f docker-compose.yml -f docker-compose.vieneu.yml up --build
-```
 
-## GPU cho VOICEVOX
-
-```bash
+# GPU (VOICEVOX only)
 docker compose -f docker-compose.yml -f docker-compose.gpu.yml up --build
 ```
 
-## Biến môi trường quan trọng
+For production, layer `docker-compose.prod.yml` on top — see [`docs/en/self-hosting.md`](docs/en/self-hosting.md).
 
-### Core
-- `DATABASE_URL`
-- `REDIS_URL`
-- `ARTIFACT_ROOT`
-- `CACHE_ROOT`
+## Where to go next
 
-### VOICEVOX
-- `VOICEVOX_BASE_URL`
+| You want to... | Read this |
+|---|---|
+| Understand the system | [`docs/en/architecture.md`](docs/en/architecture.md) |
+| Deploy on your own server | [`docs/en/self-hosting.md`](docs/en/self-hosting.md) |
+| Operate it day-to-day (backup, migrate, monitor) | [`docs/en/operations.md`](docs/en/operations.md) |
+| Hack on the code | [`docs/en/development.md`](docs/en/development.md) |
+| Use the HTTP API | [`docs/en/api.md`](docs/en/api.md) |
+| Understand the database | [`docs/en/database.md`](docs/en/database.md) |
+| See which engines are supported and how | [`docs/en/providers.md`](docs/en/providers.md) |
+| See what features exist (and what's planned) | [`docs/en/feature-map.md`](docs/en/feature-map.md) |
+| Understand the UI/UX rules | [`docs/en/design-system.md`](docs/en/design-system.md) |
+| Contribute | [`CONTRIBUTING.md`](CONTRIBUTING.md) · [`AGENTS.md`](AGENTS.md) for AI assistants |
 
-### Piper runtime
-- `PIPER_BASE_URL`
-- `PIPER_TIMEOUT_SECONDS`
-- `PIPER_VOICE_IDS`
-- `PIPER_DOWNLOAD_ON_START`
+## Tech stack
 
-### Kokoro runtime
-- `KOKORO_BASE_URL`
-- `KOKORO_TIMEOUT_SECONDS`
+| Layer | Tech |
+|---|---|
+| Frontend | React 18 · TypeScript · Vite · Vitest · ESLint · Prettier |
+| Backend | FastAPI · SQLAlchemy 2 · Alembic · Pydantic v2 · Dramatiq · Ruff · Black · Mypy · pytest |
+| Data | PostgreSQL 16 · Redis 7 |
+| Storage | Local FS (default) · S3 / MinIO / R2 (optional) |
+| Engines | VOICEVOX · Piper (`piper-tts`) · Kokoro (`kokoro`) · VieNeu-TTS (`vieneu`) · OpenAI · ElevenLabs · Google Cloud TTS · Azure Speech |
+| Ops | Docker Compose · Prometheus exporter · GitHub Actions CI · pre-commit |
 
-### VieNeu runtime
-- `VIENEU_TTS_BASE_URL`
-- `VIENEU_TTS_TIMEOUT_SECONDS`
+## License
 
-## Ghi chú thực tế
-
-### Piper
-Piper runtime là integration thật, nhưng model files phụ thuộc voice IDs mà anh chọn. Compose override hiện đã hỗ trợ auto-download một số voice phổ biến khi service khởi động.
-
-### Kokoro
-Kokoro runtime là integration thật qua official Python library. Lần chạy đầu có thể chậm hơn vì model/weights cần được kéo về local cache.
-
-### VieNeu-TTS
-VieNeu runtime trong repo này dùng local Turbo mode của official SDK để dễ self-host và dễ chạy local hơn. Nó là engine thật, không còn chỉ là contract mẫu nữa. Tuy vậy, em chưa thể verify end-to-end package build trong môi trường hiện tại.
-
-## SSE
-Backend có:
-- `GET /events/snapshot`
-- `GET /events/stream`
-
-Frontend có thể subscribe SSE để tự cập nhật jobs / events / project stats mà không cần refresh tay.
-
-## Project management
-Repo hiện đã có lớp project để tổ chức workflow:
-- project metadata
-- default provider / output format
-- tags / settings
-- jobs gắn với project
-
-Đây là base để sau này mở sang:
-- workspace
-- presets
-- access control
-- billing / usage analytics
-
-## Tài liệu nên đọc tiếp
-- `ARCHITECTURE.md`
-- `SCHEMA.md`
-- `CURRENT_STATE.md`
-- `ROADMAP_4_WEEKS.md`
-
-
-## Performance, monitoring and self-host operations
-
-This build adds:
-- backend voice search (`/catalog/voices/search`)
-- monitor endpoints (`/monitor/status`, `/monitor/logs`)
-- change-aware SSE snapshots with heartbeat fallback
-- request/job lifecycle logging to rotating log files
-- in-app self-host monitor page
-
-See `PERFORMANCE_NOTES.md` for the bottlenecks found and what was changed.
-
-
-## Engine logs in Monitor
-
-The Monitor page can now tail both:
-- application logs (`api`, `worker`)
-- engine container logs (`voicevox`, `piper`, `kokoro`, `vieneu`)
-
-For Docker Compose deployments, the API container reads engine logs through the Docker socket mounted read-only at `/var/run/docker.sock`.
-
-## Project script rows
-
-Projects can now store ordered script rows through the backend API:
-- `GET /projects/{project_key}/rows`
-- `PUT /projects/{project_key}/rows`
-- `POST /projects/{project_key}/rows/queue`
-- `POST /projects/{project_key}/rows/merge`
-
-This model is intended for line-by-line narration workflows where each row can be regenerated independently and optionally merged into a final master file.
-
-## Script line editor UI
-
-Bản này đã kéo `project_script_rows` lên thành màn hình frontend hoàn chỉnh tại route `#/script`.
-
-UI hiện hỗ trợ:
-- chọn project đang làm việc
-- import script nhiều dòng
-- thêm / sửa / xoá / nhân bản / reorder từng dòng
-- bật/tắt từng dòng
-- chọn dòng có được đưa vào file master hay không
-- gán voice riêng cho từng dòng bằng full voice picker đa engine
-- bulk apply voice cho các dòng đã chọn hoặc toàn bộ dòng bật
-- lưu script rows xuống backend
-- render dòng đã chọn hoặc toàn bộ dòng bật
-- preview/download artifact từng dòng
-- merge các dòng đã hoàn thành thành một master audio artifact
-
-Workflow thực tế nên dùng:
-1. tạo project
-2. mở `Script Editor`
-3. import hoặc thêm từng dòng text
-4. gán voice mặc định hoặc override từng dòng
-5. save rows
-6. queue selected/enabled rows
-7. nghe lại artifact từng dòng
-8. merge completed rows thành file master
-
-Lưu ý: API rows hiện dùng `PUT` replace toàn bộ rows, nên khi sửa script và lưu, các row được tái tạo theo thứ tự hiện tại. Đây là lựa chọn đơn giản cho MVP; phase sau nên bổ sung PATCH từng row để giữ lịch sử chi tiết hơn.
-
-## Provider credentials and per-engine voice settings
-
-Bản này bổ sung một lớp settings thực tế cho self-host và cloud providers:
-
-- `GET /settings`
-- `PUT /settings/provider-credentials/{provider_key}`
-- `GET /settings/voice-parameter-schemas`
-- `PATCH /settings/merge-defaults`
-
-### API keys / runtime endpoints
-
-Vào **Settings → Provider credentials** để cấu hình:
-- OpenAI API key / model
-- ElevenLabs API key / model
-- Google Cloud TTS access token / project id
-- Azure Speech key / region
-- VOICEVOX / Piper / Kokoro / VieNeu runtime URL
-
-Nếu biến môi trường tương ứng đã được set, ENV sẽ được ưu tiên hơn DB settings. UI sẽ hiển thị trạng thái `ENV override active` để tránh nhầm lẫn.
-
-### Voice parameter schema
-
-Không dùng một form cố định cho tất cả voice. Mỗi provider có schema riêng:
-- OpenAI: `speed`, `instructions`
-- ElevenLabs: `speed`, `stability`, `similarity_boost`, `style`, `use_speaker_boost`
-- Google: `speakingRate`, `pitch`, `volumeGainDb`, `sampleRateHertz`
-- Azure: SSML-style `rate`, `pitch`, `volume`, `style`
-- VOICEVOX: `speedScale`, `pitchScale`, `intonationScale`, `volumeScale`, pause controls
-- Piper: `length_scale`, `noise_scale`, `noise_w`, `speaker_id`
-- Kokoro / VieNeu: speed/reference-oriented controls
-
-Frontend dùng schema này để render form động ở:
-- `Create Job`
-- `Script Editor` row-level voice settings
-- `Settings → Voice parameter schemas`
-
-### Merge defaults
-
-`merge_silence_ms`, `merge_output_format`, `normalize_loudness` được cấu hình ở hai cấp:
-- **Global merge defaults** trong Settings
-- **Project defaults** trong Settings, override global cho project hiện tại
-
-Script Editor dùng project defaults làm giá trị ban đầu cho merge master audio.
+[MIT](LICENSE).

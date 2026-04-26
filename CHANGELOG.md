@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Production readiness (Epic 4).**
+  - **API versioning.** All routes are mounted under `/v1/*` (canonical) and the legacy un-versioned paths (`/jobs`, `/projects`, `/catalog/...`) continue to work for backward compatibility but emit a `Deprecation: true` response header. New integrations should target `/v1`.
+  - **Storage backend abstraction.** `backend/src/voiceforge/services/storage.py` defines an `ArtifactStorage` Protocol with two implementations: `LocalArtifactStorage` (default, writes under `ARTIFACT_ROOT`) and `S3ArtifactStorage` (S3 / MinIO / Cloudflare R2 via `boto3`, lazy-imported). Selected via `STORAGE_BACKEND=local|s3` plus `S3_*` environment variables. `LocalArtifactStorage` rejects any key that resolves outside the artifact root.
+  - **Production overlay (`docker-compose.prod.yml`).** Adds restart policies, resource limits, structured JSON logging, and removes the Docker socket mount on the API container (masked with `/dev/null` because Compose merges volumes by mount-point). Drops Postgres/Redis host port bindings via `ports: !reset []` (Compose v2.24+).
+  - **nginx + multi-stage frontend (`frontend/Dockerfile.prod`, `frontend/nginx.conf`).** Builds the React bundle in a node stage and serves it through nginx with SPA fallback, gzip, and immutable asset caching.
+  - **In-process token-bucket rate limiter (`backend/src/voiceforge/rate_limit.py`).** Per-client (API key or IP) bucket. Disabled when `RATE_LIMIT_PER_MINUTE=0`. Returns HTTP 429 with `Retry-After`. Stale buckets are swept once per window to prevent unbounded growth. Only honors the `X-API-Key` discriminator when the header value is in the allowed set, so untrusted callers cannot rotate it to rent fresh quotas.
+  - **Prometheus metrics (`backend/src/voiceforge/observability.py`, `/metrics`).** Tracks HTTP request rate, duration, and status; job state transitions; in-flight gauge. Path label is bounded to the matched route template (or a `__unmatched__` sentinel) to prevent cardinality DoS. Metric updates flow exclusively through a single API-side Redis subscriber so worker-originated transitions remain visible to the API's `REGISTRY`. The in-flight gauge is seeded from the database at startup and clamped to ≥ 0 to survive restarts. Disabled when `METRICS_ENABLED=false`.
+
+### Changed
+- `services_jobs.process_job` re-checks the job's `status` from the database before each terminal write (cache-hit success, synth success, synth failure) so a concurrent `cancel_job` is no longer overwritten by a stale `succeeded`/`failed`.
+
+### Security
+- `LocalArtifactStorage` resolves and validates artifact keys against the storage root — `..`/absolute paths in keys raise `ValueError`.
+- `S3ArtifactStorage.exists()` only returns `False` for canonical 404 responses; 403 / network / credential errors propagate so callers don't silently treat inaccessible objects as missing.
+
+## Epic 1 → Epic 3 (merged into `main` ahead of [Unreleased] tag)
+
+### Added
 - **Operational safety (Epic 1).** Migrations are now the single source of truth in production: `db.init_db()` only runs `Base.metadata.create_all` when `APP_ENV` is `development` or `test`. A dedicated `migrate` service in `docker-compose.yml` runs `alembic upgrade head` before `api` and `worker` start.
 - `backend/VERSION` (1.0.0) and `settings.app_version`. The `/health` endpoint now returns `version`, `app_env`, and `alembic_revision`. Every response carries an `X-App-Version` header.
 - Healthchecks on `postgres`, `redis`, and `api`; `depends_on.condition: service_healthy` / `service_completed_successfully` wiring.
@@ -28,11 +46,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Design tokens (`--vf-color-*`, `--vf-radius-*`, `--vf-space-*`) declared at the top of `styles.css`; new components consume them.
   - `<ErrorBoundary>` wraps the app at the root; `Skeleton` / `SkeletonBlock` components for loading states.
 
-### Changed
+### Changed (Epic 1–3)
 - `docker-compose.yml` now serializes `migrate → api/worker` and exposes `APP_ALLOWED_ORIGINS` to the API container.
 - `services_catalog.refresh_catalog` calls each provider's `list_voices` through a per-call timeout and never raises on provider errors.
 
-### Security
+### Security (Epic 1–3)
 - CORS no longer accepts wildcard origins by default; configure `APP_ALLOWED_ORIGINS` per environment.
 - Provider API keys, tokens, and Azure/Google credentials stored in `app_settings` are encrypted at rest when `APP_ENCRYPTION_KEY` is set.
 
