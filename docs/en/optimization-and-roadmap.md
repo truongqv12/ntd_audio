@@ -2,200 +2,285 @@
 
 > **For AI agents:** this is the **forward-looking** doc. Anything here is **not yet implemented**. Do not document items below as if they exist. When working on one of these initiatives, move the relevant block into `feature-map.md` (with the file paths it landed in) and shrink the entry here.
 >
-> **For humans:** the prioritized list of post-Epic-4 work that turns `ntd_audio` from "self-hostable" into "comfortable to operate at scale." Each item lists the symptom, the proposed fix, where it touches, and how to verify when it lands.
+> **For humans:** the prioritized list of post-Epic-4 work, scoped for the project's actual deployment shape: **a single user running the stack on one machine via Docker.** Items optimize feature value and UX over multi-tenant or platform-grade infrastructure.
 
 ## TL;DR
 
-- Epic 1 → Epic 4 has shipped (operational safety, tooling, feature gaps, production readiness). The base is solid.
-- The next phase is **wire-up & scale**: making the pieces Epic 4 introduced actually exercised, plus multi-user, plus deployability beyond Compose.
-- The eight initiatives below are ordered by **impact on a self-hosting operator**, not by implementation effort.
+- The deployment target is **one person, one Docker host**. Multi-user, multi-tenant, and Kubernetes work is intentionally out of scope.
+- Tier 1 is **new user-facing features** (bulk import, multi-voice dialogue, subtitle output).
+- Tier 2 is **host adaptation** (GPU detect, concurrency tuning).
+- Tier 3 is **quality of life** (provider plugins, simple retention, smoke E2E).
+- The "Out of scope" section lists what was deliberately removed from earlier roadmaps and the reason.
+
+## Scope: who this is for
+
+`ntd_audio` is built for the developer running it on their own machine to produce TTS audio for personal projects (videos, podcasts, audio dramas, study material). That shapes every priority decision below:
+
+- **Authentication** is "API key or nothing" — there's no second user.
+- **Deployment** is `docker compose up`. Helm / Kubernetes / autoscaling don't apply.
+- **Workers** run on the same machine as the API. Queue priorities, dead-letter queues, and per-tenant concurrency caps add complexity for no benefit.
+- **Telemetry** doesn't apply — there's nothing for the project to learn from a single anonymous install.
 
 ## How this doc is organized
 
 For each item:
-1. **Why it matters** (concrete pain it removes).
+1. **Why it matters** (concrete pain it removes for a single-user install).
 2. **What changes** (files / components touched).
-3. **Acceptance criteria** (what "done" looks like — the test that proves it shipped).
+3. **Acceptance criteria** (the test that proves it shipped).
 4. **Risk and migration notes** (what existing installs need to do).
 
-## 1. Wire `ArtifactStorage` into `write_artifact`
+---
 
-**Why it matters.** Today, `STORAGE_BACKEND=s3` is a no-op for new artifacts: the `ArtifactStorage` Protocol exists in `services/storage.py`, but the real write path in `services_jobs.process_job` (and the existing `storage.py` helper it calls) writes to the local filesystem unconditionally. Operators who follow `self-hosting.md` and set the S3 env vars get a silently-broken setup.
+## Tier 1 — User-facing features
+
+### 1. Bulk import: TXT / CSV → batch project
+
+**Why it matters.** The single most common workflow is "I have a list of sentences, give me one audio file per sentence." Today, every line has to be entered manually in `ScriptEditor`, one at a time. This is the highest-value feature on the list.
 
 **What changes.**
 
-- Replace the direct `Path.write_bytes` / `cache_root` calls in `services_jobs.process_job` with `storage = get_storage(); storage.write_bytes(key, audio_bytes)`.
+- New endpoint `POST /v1/projects/{key}/script-rows/bulk` that accepts:
+  - `multipart/form-data` with a `.txt` (one line = one row) or `.csv` (configurable text column, optional `voice` and `speaker` columns) attachment.
+  - JSON option: paste raw text and split on newline / blank line / custom delimiter.
+- The endpoint inserts N `project_script_rows`, optionally enqueues all of them as jobs in one go, and returns a project-level batch ID for progress tracking.
+- Frontend: `ScriptEditor` gains a "Import" button (file picker + drag-drop). After import, a confirm modal shows the parsed rows and lets the user pick: assign one voice to all, or "use voice column from CSV".
+- Output naming convention: `{project_key}_{row_index:03d}_{sanitized_text_prefix}.{ext}` so files have a stable, sortable name.
+- A new "Download all (zip)" action on the project page when ≥ 2 jobs in the project are `succeeded`. The zip contains the audio files and (when subtitle generation lands — see #3) the matching subtitles.
+
+**Acceptance criteria.**
+
+- A user can drag a `.txt` with 50 lines, pick one voice, click Run, and end up with 50 audio files in the project artifacts.
+- A user can upload a CSV like `text,voice` and get one audio per row, with the per-row voice override applied.
+- Cancel works at two levels: cancel the whole batch (cancels all queued/running rows) and cancel a single row.
+- Per-row progress is visible (queued → running → succeeded/failed/canceled).
+
+**Risk and migration.** New endpoint; no breaking change to existing projects.
+
+### 2. Multi-voice / dialogue mode
+
+**Why it matters.** Today, all rows in a project use one voice (or per-row voice, but with no concept of "speaker"). For a podcast, audio drama, or dialogue scene, the user wants two or more characters speaking, with named speaker tags carrying through to subtitles and exports.
+
+**What changes.**
+
+- Schema: `project_script_rows.speaker_label` (nullable text — "Anna", "Host", etc.) and `projects.settings.speakers` (a JSON map of `speaker_label → voice_key`).
+- `ScriptEditor` UI: a "Speakers" panel where the user defines `Anna → kokoro:af_heart`, `Host → openai:onyx`. Then in the row editor, picking a speaker auto-fills the voice for that row.
+- Two output modes per project (`projects.settings.output_mode`):
+  - **Stems** (default, current behavior): one audio file per row.
+  - **Conversation**: at the end of a successful batch, the worker concatenates all rows in order with configurable inter-row silence (e.g. 300 ms) into a single mixdown file. The mixdown becomes its own artifact (kind `conversation_mixdown`).
+- Subtitle output (next item) carries the speaker label.
+
+**Acceptance criteria.**
+
+- A user can define 2+ speakers, assign rows to speakers, and run the batch.
+- "Stems" mode produces one file per row, named with the speaker label (e.g. `001_anna_hello.wav`).
+- "Conversation" mode produces a single file with rows concatenated in order, plus the per-row stems.
+- Silence-between-rows is configurable per project (`projects.settings.conversation_gap_ms`).
+
+**Risk and migration.** Adds two new schema columns + one settings key. Existing projects: `speaker_label` is null (treated as no-speaker), `output_mode` defaults to `stems` (current behavior).
+
+### 3. Subtitle output (.srt / .vtt)
+
+**Why it matters.** For video creators (the natural audience for this kind of TTS workflow), the audio file alone is half the asset. They want a synchronized subtitle file per row or per conversation, with optional speaker labels for dialogue.
+
+**What changes.**
+
+- New artifact kind: `subtitle` (file extension `.srt`; `.vtt` available via query param on download).
+- For engines that emit timing info (some cloud providers expose phoneme-level or sentence-level timestamps), use that timing directly.
+- For engines that don't, estimate timing from `audio_duration_ms` and `char_count` (uniform char-per-second within the row, with sentence breaks aligned to punctuation).
+- For "Conversation" output mode, the subtitle is one combined `.srt` covering the full mixdown, with each row as a cue and the speaker label (if any) prefixed (`[Anna] Hello there.`).
+- Frontend: subtitle download appears next to audio download on the project page.
+
+**Acceptance criteria.**
+
+- After a successful job, downloading subtitle returns valid SRT (verified against the `srt` parsing library).
+- Conversation mode produces one combined SRT; stems mode produces one SRT per row.
+- For an engine that emits real timestamps (e.g. Google Cloud TTS markup mode), the SRT cue boundaries match what the audio actually says (within a small tolerance).
+- For an engine without timing info, the SRT is at least monotonic and the total duration matches the audio file's duration.
+
+**Risk and migration.** Pure addition. New artifact kind needs an enum migration but no destructive change.
+
+### 4. Inline single-row preview
+
+**Why it matters.** Cloud TTS providers charge per character; OSS local engines aren't free either (CPU/GPU time, warmup). Today, the only way to hear a row is to enqueue a full job. A 1-row preview is fast feedback and saves quota.
+
+**What changes.**
+
+- New endpoint `POST /v1/preview` that accepts `{ text, voice, params }`, runs synchronously in the API process (or fast queue if cloud-bound) with a hard timeout (≈ 15 s), and streams the audio back as the response body.
+- Preview results bypass `synthesis_jobs` — they're not stored in the artifact catalog.
+- Frontend: each row in the editor gets a small "Preview" button. Hover state + skeleton while waiting; auto-stops if the user moves on.
+
+**Acceptance criteria.**
+
+- Preview returns audio in < 15 s for cloud TTS providers; for OSS engines, preview either succeeds within 30 s or returns 504.
+- Preview never creates a `synthesis_jobs` row.
+- Rate-limit applies to preview the same way it applies to other endpoints (`RATE_LIMIT_PER_MINUTE`).
+- Preview audio is never written to disk (in-memory only, response stream).
+
+**Risk and migration.** New endpoint, additive.
+
+### 5. Project export bundle
+
+**Why it matters.** A finished project (script + voice mappings + audio + subtitles) is portable content the user wants to back up, share, or move between machines. Today, exporting requires manually downloading each artifact and remembering which voice was used.
+
+**What changes.**
+
+- New endpoint `GET /v1/projects/{key}/export` that returns a zip containing:
+  - `script.json` — full row dump, including `text`, `voice`, `speaker`, ordering.
+  - `voice-map.json` — speaker-to-voice-key mapping (resolved against the catalog at export time).
+  - `original.txt` / `original.csv` — the file that was imported (if any), preserved verbatim.
+  - `audio/` — every successful artifact, named per the convention from #1.
+  - `subtitles/` — matching `.srt` files (when #3 ships).
+  - `metadata.json` — project ID, title, created/updated timestamps, schema version.
+- Reverse: `POST /v1/projects/import` accepts the same zip and recreates the project (idempotent on `project_key`; existing artifacts are reused).
+
+**Acceptance criteria.**
+
+- Export of a 50-row project produces a single zip containing all rows, all audio, and the voice map.
+- Importing the zip on a fresh install recreates the project with the same rows in the same order.
+- Round-trip (export → import → export) produces byte-identical script.json and voice-map.json.
+
+**Risk and migration.** Pure addition. The export schema is part of the public contract; bumps require a CHANGELOG entry.
+
+---
+
+## Tier 2 — Host adaptation
+
+### 6. GPU / CPU auto-detect
+
+**Why it matters.** OSS engines (especially Kokoro and VieNeu) can run dramatically faster on a GPU. Today, the user has to manually pick the right Compose overlay and trust that the engine container picks up the GPU. There's no UI surface that tells you whether GPU acceleration is actually active.
+
+**What changes.**
+
+- At API startup, probe the host:
+  - Is `nvidia-smi` available and returning a device?
+  - Is `/dev/dri` populated (Intel/AMD)?
+  - What does `os.cpu_count()` report?
+- Expose at `GET /v1/system/capabilities` (gated by API key when present): `{ gpu: { vendor, name, vram_mb } | null, cpu: { cores, threads }, recommended_overlays: [...] }`.
+- Per-engine container, a small `/healthz` extension that reports back which device the engine actually loaded on (CPU vs CUDA).
+- Frontend: Settings → "Host" tab shows the detected hardware and which engines are using it. If a GPU is present but a CPU-only overlay is active, surface a one-click "switch to GPU overlay" hint with the exact `docker compose` command to run.
+
+**Acceptance criteria.**
+
+- On a host with an NVIDIA GPU, `/v1/system/capabilities` reports it correctly.
+- On a CPU-only host, the GPU field is `null` and the recommended overlays don't include GPU variants.
+- Settings → Host tab matches what the engine containers actually report.
+
+**Risk and migration.** Pure addition. No breaking change.
+
+### 7. Concurrency tuning per provider
+
+**Why it matters.** Cloud TTS endpoints are network-bound and happily run 4–8 in parallel. OSS engines on a single CPU saturate around 1–2 concurrent jobs. Today, there's a single global worker prefetch — too high for OSS, too low for cloud. The user gets either a slow batch or a thrashing host.
+
+**What changes.**
+
+- New per-provider `concurrency_hint` in the provider registry (e.g. `openai_tts: 8`, `voicevox: 2`, `kokoro: 1`).
+- Worker dispatch reads the hint and uses an in-process semaphore per `provider_key` so a batch of 50 OpenAI rows runs 8-wide while a batch of 50 Kokoro rows runs 1-wide.
+- Settings → "Performance" panel: a slider per provider (default = the registry hint, cap = 16). The chosen values persist in `app_settings`.
+- Default global cap is `min(os.cpu_count(), 4)` for OSS engines and `8` for cloud engines.
+
+**Acceptance criteria.**
+
+- Running a 20-row batch against `openai_tts` completes substantially faster than the same batch ran serially (within network/provider rate-limit bounds).
+- Running a 20-row batch against `voicevox` doesn't peg a 4-core host's load above 4.
+- The Settings UI honors the override; setting cloud = 1 forces serial execution.
+
+**Risk and migration.** New `app_settings` key; existing installs default to the registry hint.
+
+### 8. Wire `ArtifactStorage` into `write_artifact`
+
+**Why it matters.** Even on a personal install, the user often wants artifacts written to a NAS, an external drive, or an S3-compatible bucket on a home server (MinIO). Today, `STORAGE_BACKEND=s3` is a no-op for new artifacts because the legacy write path bypasses the `ArtifactStorage` Protocol. Following `self-hosting.md` and setting the env vars yields a silently broken setup.
+
+**What changes.**
+
+- Replace direct `Path.write_bytes` / `cache_root` calls in `services_jobs.process_job` with `storage = get_storage(); storage.write_bytes(key, audio_bytes)`.
 - Same for the `generation_cache` write path.
-- Migrate the read path (`/v1/jobs/{id}/artifact`, library download) to read through the abstraction.
-- Add an integration test that boots a localstack / minio container and round-trips an artifact through `S3ArtifactStorage`.
-- Document the S3 vs local trade-offs explicitly in `self-hosting.md` (already covered structurally; needs a "what does this **not** do" callout when local is selected — e.g., zero-downtime migration between backends is out of scope).
+- Migrate the read path to read through the abstraction.
+- Add a smoke test that boots MinIO in CI and round-trips an artifact.
+- Document in `self-hosting.md` that local → S3 migration of existing artifacts requires `aws s3 sync` (no automatic copy on boot).
 
 **Acceptance criteria.**
 
 - `STORAGE_BACKEND=s3` plus `S3_*` env vars makes new jobs write into the bucket; downloads stream from the bucket; nothing touches `ARTIFACT_ROOT`.
 - `STORAGE_BACKEND=local` continues to work bit-for-bit identically.
-- New integration test: `pytest backend/tests/test_storage_s3.py` runs against MinIO in CI.
+- New integration test passes against MinIO in CI.
 
-**Risk and migration.** Existing `local` installs are unaffected (default unchanged). For installs migrating `local → s3`, there's no automatic copy; document `aws s3 sync $ARTIFACT_ROOT s3://$S3_BUCKET/$S3_PREFIX` in operations.md.
+**Risk and migration.** Existing `local` installs unaffected (default unchanged).
 
-## 2. JWT / multi-user auth
+---
 
-**Why it matters.** The current API-key gate (`X-API-Key`) is fundamentally single-tenant: every key has the same authority over every project, every job, every setting. Self-host operators who want to share the deployment among teammates have no per-user audit, no revocation granularity, and no way to scope a key to a project.
+## Tier 3 — Quality of life
 
-**What changes.**
+### 9. Provider plugin entry points
 
-- Schema: `users (id, email, password_hash, created_at, disabled_at)`, `sessions (id, user_id, expires_at, ...)`, `api_tokens (id, user_id, name, hashed_token, scopes, last_used_at, expires_at)`. Optional in v1: workspace tier (`workspaces`, `workspace_members`).
-- Auth surface: `/v1/auth/login` (email + password), `/v1/auth/logout`, `/v1/auth/sessions/me`, `/v1/auth/tokens` (CRUD). Session cookie (HttpOnly, SameSite=Strict) for the SPA; bearer token for programmatic access.
-- Authz: every existing endpoint takes a `current_user` dependency. Existing `X-API-Key` keeps working (read as a token with implicit "owner" scope) so existing integrations don't break.
-- Frontend: login page, session bootstrap, logout. Settings → "Tokens" tab to manage personal tokens.
-- Password hashing: `argon2-cffi` (already a transitive dep of `passlib` if we use it; otherwise add direct).
-
-**Acceptance criteria.**
-
-- A user can register (or be seeded by an admin), log in, and operate the app entirely via session cookie.
-- A user can mint named tokens with optional expiry and revoke them.
-- An existing `APP_API_KEYS` setup keeps working, treated as legacy "superuser" tokens.
-- New tests cover: failed login lockout policy, token revocation, scope enforcement on at least one endpoint.
-
-**Risk and migration.** This is the largest item on the list. Schema migration is non-trivial and has to be reversible. Existing single-user installs default to "no auth required" if `APP_API_KEYS` is empty — the new auth must keep that ergonomic in dev (e.g., `APP_AUTH_MODE=open|api-key|jwt`).
-
-## 3. Worker scaling primitives
-
-**Why it matters.** Today, the worker is one Dramatiq actor on the `voiceforge` queue. Replicating it horizontally is doable (`docker compose up --scale worker=3`), but there is **no priority routing**, **no dead-letter queue**, **no per-project concurrency cap**, and **no graceful drain on deploy**. A long synthesis from one user will starve fast jobs from another. A failing provider will retry forever (Dramatiq default) without a DLQ to inspect.
+**Why it matters.** Adding a TTS engine today requires editing the provider registry. For a personal install, the user occasionally wants to plug in their own model (a fine-tune, a research checkpoint, a niche language model) without forking the project.
 
 **What changes.**
 
-- Split into two queues: `voiceforge.fast` (cloud TTS, expected < 30s) and `voiceforge.slow` (OSS local engines, larger texts). Route by predicted duration based on `provider_key` and `len(text)`.
-- Configure Dramatiq middleware: `Retries(max_retries=3, retry_when=...)`, `CurrentMessage`, `AsyncIO` if needed. Add a custom DLQ middleware that, on max retries, writes a row to `dead_letter_jobs` (table to add) and publishes `reason=dead_lettered`.
-- Per-project concurrency cap via Redis-backed semaphore (`SETNX project:{key}:slots:{i}`). Max simultaneous jobs per project from `projects.settings.max_concurrent_jobs`.
-- Graceful drain: SIGTERM handler that finishes in-flight tasks then exits; document the worker termination grace period (`stop_grace_period: 120s`) in compose.
-
-**Acceptance criteria.**
-
-- Two replicas of `worker` can run independently; load distributes; cancel/retry still work.
-- Failed jobs that exhaust retries land in `dead_letter_jobs` and are visible in `/v1/jobs?status=dead_lettered`.
-- Setting `projects.settings.max_concurrent_jobs=1` serializes that project's jobs even with multiple workers.
-- Killing the worker with `docker compose stop worker` does not corrupt in-flight jobs (they finish or are reaped).
-
-**Risk and migration.** Queue split is a Dramatiq config change; existing queued jobs might land in the wrong queue during the upgrade window. Mitigation: a one-shot script that re-routes pending jobs after the upgrade.
-
-## 4. End-to-end browser tests (Playwright)
-
-**Why it matters.** Vitest covers components in isolation; pytest covers handlers. Neither catches "I clicked New Job, picked a voice, hit submit, and the result isn't visible." E2E tests catch the integration glue (CORS, SSE reconnection, form ↔ API contract drift).
-
-**What changes.**
-
-- Add `frontend/e2e/` with Playwright. Three scenarios for v1:
-  1. **Smoke:** open `/`, see Dashboard, see at least one project (the bootstrap default).
-  2. **Create + complete a job:** create a job with a stub provider that returns a fixed audio file, wait via SSE for `succeeded`, download artifact.
-  3. **Cancel a long job:** start with a slow provider, click Cancel, confirm `canceled` state propagates.
-- A separate Compose profile `e2e` that boots a stub provider sidecar (`engines/stub-runtime/`), so tests don't depend on real cloud APIs.
-- New CI job: `frontend-e2e` on PRs that touch `frontend/`, `backend/`, or `engines/`.
-
-**Acceptance criteria.**
-
-- `make e2e` builds the stack, runs Playwright, tears down. Runs locally and in CI.
-- Failing E2E blocks PR merges on the relevant paths.
-- Test artifacts (screenshots + video on failure) uploaded to the GitHub Actions run.
-
-**Risk and migration.** New CI minutes. Mitigate by only running E2E on relevant paths and on `main`.
-
-## 5. Provider plugin system
-
-**Why it matters.** Adding a TTS engine today requires editing `backend/src/voiceforge/providers/__init__.py` to register it. That blocks two real use cases: (a) self-host operators who want to add their own internal model without forking, and (b) keeping the upstream provider list manageable as new engines emerge.
-
-**What changes.**
-
-- Define a stable provider Protocol in `backend/src/voiceforge/providers/protocol.py` (already partially formalized; turn it into a tagged ABC).
-- Discover providers via Python entry points: `[project.entry-points."voiceforge.providers"]`. The built-in ones (voicevox, piper, kokoro, vieneu, openai, elevenlabs, google, azure) move to entries; the registry loads them at startup.
-- Allow operator-side `pip install voiceforge-provider-foo` to add a provider with no code changes here.
-- Schema for `provider parameter schemas` (already structured per-provider) becomes part of the entry-point return — registry reads schemas dynamically.
+- Define a stable provider Protocol (already partially formalized) and turn it into a tagged ABC.
+- Discover providers via `[project.entry-points."voiceforge.providers"]`. The built-in ones move to entries; the registry loads them at startup.
+- A small example plugin in `examples/voiceforge-provider-stub` shows the contract.
+- `docs/en/providers.md` gains a "Build your own" section.
 
 **Acceptance criteria.**
 
 - All existing providers continue to work, registered via entry points.
-- A small example plugin in a separate directory (`examples/voiceforge-provider-stub`) demonstrates the contract; it's installable with `pip install -e ./examples/...` and shows up in the catalog.
-- The provider Protocol is documented in `docs/en/providers.md` with a "Build your own" section.
+- The example plugin is installable with `pip install -e ./examples/...` and shows up in the catalog.
 
 **Risk and migration.** Internal — no operator-facing breaking change.
 
-## 6. Helm chart for Kubernetes
+### 10. Simple retention controls
 
-**Why it matters.** Compose is great for single-host self-host. Past that (multi-replica, autoscale, managed Postgres, managed Redis), operators move to Kubernetes. A first-class Helm chart keeps the project's deployment story coherent.
-
-**What changes.**
-
-- New `deploy/helm/ntd-audio/` chart. One Deployment per service (api, worker, frontend), one Job for `migrate`, optional sub-charts for Postgres / Redis (or BYO via values).
-- Engine sidecars become optional `values.engines.{voicevox,piper,kokoro,vieneu}.enabled`.
-- Secrets via `values.secrets` (operator can wire ExternalSecrets / Sealed Secrets / cloud KMS).
-- Ingress template with TLS via cert-manager.
-- Health/readiness probes from `/health` (already designed for it).
-- A `helm test` hook that hits `/health` and `/metrics` against the deployed chart.
-
-**Acceptance criteria.**
-
-- `helm install ntd-audio deploy/helm/ntd-audio --set ...` produces a running app on a kind / k3d cluster.
-- `helm test` passes.
-- Chart published to a GitHub Pages-backed Helm repo on tag.
-- Document on `self-hosting.md` (or a new `kubernetes.md`) with values examples.
-
-**Risk and migration.** New deployment surface to maintain. Defer until the Compose path is fully stable (it is).
-
-## 7. Anonymous opt-in telemetry
-
-**Why it matters.** "Which engines are popular? How big are typical scripts? Which features do people actually use?" — these questions feed prioritization. Without telemetry, the project is flying blind. **Strict opt-in** is the only acceptable design — surveillance-by-default is incompatible with self-host.
+**Why it matters.** Artifacts and `generation_cache` rows accumulate forever. A casual user with months of experimentation eventually fills disk. The previous roadmap proposed a full per-project retention policy table — overkill for personal use.
 
 **What changes.**
 
-- New env var `TELEMETRY_ENABLED=false` (default). Operator must set it explicitly to `true`.
-- A small daily ping from the API: `POST https://telemetry.<project domain>/v1/install` with:
-  - Anonymous install ID (UUID generated on first run, persisted in `app_settings`).
-  - Version, OS / arch.
-  - Counts (not contents) of: jobs by provider (24h), active projects, distinct voices used.
-  - **Never:** text content, voice samples, project names, user data.
-- The exact payload schema is documented in `docs/en/operations.md` under a new "Telemetry" section. The schema is part of the public contract; changes require a CHANGELOG entry.
-- `/v1/settings/telemetry/preview` returns the exact JSON that would be sent today, so operators can audit it.
+- Settings → "Storage" panel: shows current artifact disk usage, with a single button **"Delete jobs older than X days"** (slider, default 30 d, optional filter by status: `failed` / `canceled` / `succeeded` / all).
+- Backend endpoint `POST /v1/admin/retention/run-now { older_than_days, statuses }` — synchronous for small batches, queued for large ones.
+- Counts metric `voiceforge_artifacts_pruned_total{reason}` so the user can see how much was reclaimed.
 
 **Acceptance criteria.**
 
-- `TELEMETRY_ENABLED=false` (default) sends nothing — verified by network test.
-- `TELEMETRY_ENABLED=true` sends the documented payload daily.
-- Operator can preview and audit any payload before it's sent.
-- Documentation makes the data minimization guarantee explicit and lists every field with rationale.
+- A user can click "Delete jobs older than 30 days, failed only" and see disk usage drop accordingly.
+- The action removes both DB rows and storage objects (works for `local` and `s3`).
+- A confirmation step prevents accidental whole-history wipes.
 
-**Risk and migration.** None for existing installs (default off). Trust hinges on transparency.
+**Risk and migration.** Destructive; the action is opt-in only and shows a confirmation.
 
-## 8. Artifact garbage collection
+### 11. Playwright smoke E2E
 
-**Why it matters.** Artifacts and `generation_cache` rows accumulate forever today. A heavy-usage install will eventually fill its disk or its S3 bucket. There's no lever to control retention beyond manual deletion.
+**Why it matters.** Vitest covers components in isolation; pytest covers handlers. Neither catches "I imported a CSV, queued the batch, waited via SSE, and the zip download didn't have all the files." One tight smoke scenario catches a wide class of regressions.
 
 **What changes.**
 
-- New table `retention_policies` (or columns on `projects.settings.retention`): `keep_days_succeeded`, `keep_days_failed`, `keep_days_canceled`. Defaults: `keep_days_succeeded=null` (forever), `keep_days_failed=30`, `keep_days_canceled=14`.
-- A nightly job (Dramatiq scheduled actor) that:
-  - Selects jobs older than the policy.
-  - For each: delete artifact via `ArtifactStorage.delete(key)`, delete `generation_cache` row, set `synthesis_jobs.archived_at`.
-  - Counts metric: `voiceforge_artifacts_pruned_total{reason}`.
-- Admin endpoint `POST /v1/admin/retention/run-now` to trigger manually (gated by superuser).
-- Document the default policy and how to override per-project.
+- One scenario: **bulk import → run → wait → download zip**. CSV with 5 rows, two voices, "Conversation" output mode, expect 5 stems + 1 mixdown + 1 SRT in the zip.
+- Run against a stub-provider Compose profile so it doesn't depend on cloud APIs.
+- New CI job `frontend-e2e` on PRs touching `frontend/`, `backend/`, or `engines/`.
 
 **Acceptance criteria.**
 
-- A test that creates aged jobs (with `created_at` backdated) confirms they're pruned by the GC pass.
-- Pruning respects the `ArtifactStorage` selected (works on S3 and local).
-- Operators can disable GC entirely with `RETENTION_ENABLED=false`.
+- `make e2e` builds the stack, runs the scenario, tears down. Runs locally and in CI.
+- Failing E2E blocks PR merges on the relevant paths.
 
-**Risk and migration.** This is destructive; a new env var defaults to off in v1 and on in v2 after operator feedback.
+**Risk and migration.** New CI minutes — limit to relevant paths.
 
-## Beyond v1 of this list
+---
 
-Not yet prioritized but on the radar:
+## Out of scope (deliberately removed)
 
-- **i18n: more locales** (JP, ZH, KR). Frontend tooling already supports it; the work is translation.
-- **Frontend test coverage** at the component level for ScriptEditor (drag-drop), Settings (provider creds), Library (paginated, filterable).
-- **Voice cloning UX.** The capability exists for ElevenLabs, VieNeu — the UI doesn't yet cleanly support uploading reference audio, naming a clone, and routing jobs to it.
-- **Project export / import.** Self-hosting users want a portable "project bundle" (script rows + voice mappings + completed artifacts) for backup, sharing, and migration.
-- **WebSocket or SSE-over-HTTP/2 for events.** SSE works but doesn't multiplex; on slow networks you can run into connection-per-tab limits.
+These items were proposed in earlier roadmaps and are intentionally **not** going to be pursued, given the personal-use scope:
+
+| Removed | Why |
+|---|---|
+| **JWT / multi-user auth** | One user. The existing `X-API-Key` gate is enough; no need for accounts, sessions, or per-user audit. |
+| **Workspace boundaries / per-user audit** | Same — multi-tenant concerns don't apply. |
+| **Helm chart for Kubernetes** | One Docker host. Compose is the deployment story. |
+| **Worker scaling primitives (DLQ, priority queues, per-project concurrency caps)** | A single host with one worker doesn't benefit from this. Tier 2 #7 (concurrency tuning) covers the actual personal-use need. |
+| **Anonymous opt-in telemetry** | A single anonymous install yields no signal worth collecting. The complexity isn't justified. |
+| **Per-project retention policies (full table + nightly cron)** | Tier 3 #10 (a single "delete older than X days" button) covers the actual need with one-tenth the complexity. |
+
+If the project's scope ever changes (multi-user, hosted offering, fleet deployment), revisit this section.
+
+---
 
 ## How to propose a new initiative
 
