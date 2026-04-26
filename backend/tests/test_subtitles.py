@@ -51,6 +51,12 @@ def test_format_srt_timestamp_handles_subseconds():
     assert _format_srt_timestamp(3661.25) == "01:01:01,250"
 
 
+def test_format_srt_timestamp_carries_to_minute_and_hour_boundaries():
+    # ms-rounding at the second boundary must propagate up through min/hour
+    assert _format_srt_timestamp(59.9999) == "00:01:00,000"
+    assert _format_srt_timestamp(3599.9999) == "01:00:00,000"
+
+
 def test_format_vtt_uses_dot_separator():
     assert _format_vtt_timestamp(1.5) == "00:00:01.500"
 
@@ -74,6 +80,16 @@ def test_build_cues_estimates_when_duration_missing(db_session):
     cues = build_cues(rows, silence_ms=0)
     # 30 chars / 15 cps = 2.0 seconds
     assert abs(cues[0].end_seconds - 2.0) < 0.01
+
+
+def test_build_cues_treats_zero_duration_literally_not_as_missing(db_session):
+    # A recorded duration of exactly 0.0 must NOT be replaced by the char/sec
+    # estimate — the row contributes a zero-length cue.
+    project = _project(db_session)
+    rows = [_row(db_session, project=project, index=0, text="x" * 30, duration=0.0)]
+    cues = build_cues(rows, silence_ms=0)
+    assert cues[0].start_seconds == 0.0
+    assert cues[0].end_seconds == 0.0
 
 
 def test_speaker_label_prefixes_cue(db_session):
