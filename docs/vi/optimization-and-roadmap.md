@@ -87,24 +87,14 @@ Cancel cả batch và cancel từng row dùng hạ tầng queue/cancel có sẵn
 
 **Rủi ro và migration.** Thuần addition. Artifact kind mới cần migration enum nhưng không destructive.
 
-### 4. Inline preview 1 row
+### 4. Inline preview 1 row — **đã ship**
 
-**Vì sao quan trọng.** Cloud TTS tính phí theo ký tự; OSS local cũng không miễn phí (CPU/GPU + warmup). Hôm nay, cách duy nhất nghe row là enqueue full job. Preview 1 row là feedback nhanh và tiết kiệm quota.
+Triển khai trong `routes_providers.py::preview_arbitrary_text` + helper `previewRowSynthesis` + nút "Nghe thử" per row trong script editor.
 
-**Thay đổi gì.**
-
-- Endpoint mới `POST /v1/preview` nhận `{ text, voice, params }`, chạy đồng bộ trong API process (hoặc fast queue cho cloud-bound) với hard timeout (~ 15 s), stream audio về body response.
-- Kết quả preview bypass `synthesis_jobs` — không lưu vào artifact catalog.
-- Frontend: mỗi row trong editor có nút nhỏ "Preview". Hover state + skeleton trong khi đợi; auto-stop nếu user move on.
-
-**Acceptance criteria.**
-
-- Preview trả audio < 15 s cho cloud TTS; cho OSS engine, preview hoặc thành công trong 30 s hoặc trả 504.
-- Preview không bao giờ tạo row `synthesis_jobs`.
-- Rate-limit áp lên preview như mọi endpoint khác (`RATE_LIMIT_PER_MINUTE`).
-- Audio preview không ghi disk (in-memory only, response stream).
-
-**Rủi ro và migration.** Endpoint mới, additive.
+- `POST /v1/providers/{provider_key}/preview` nhận `{text, voice_id, output_format?, params?}` và stream audio về. Không tạo `synthesis_jobs`, không ghi artifact, không persist DB.
+- Cap độ dài qua `PREVIEW_MAX_CHARS` (default 500). Trả 413 nếu vượt.
+- Rate-limit dùng chung token bucket (`RATE_LIMIT_PER_MINUTE`).
+- Frontend: mỗi row trong `ScriptEditor` có nút "Nghe thử" cạnh ô artifact. Kết quả render qua `<audio controls src=blob:...>`; blob URL được revoke khi unmount.
 
 ### 5. Project export bundle
 

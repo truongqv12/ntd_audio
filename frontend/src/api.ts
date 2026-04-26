@@ -417,3 +417,25 @@ export function providerVoicePreviewUrl(providerKey: string, voiceId: string, te
     `${API_BASE}/providers/${encodeURIComponent(providerKey)}/voices/${encodeURIComponent(voiceId)}/preview${query}`,
   );
 }
+
+export async function previewRowSynthesis(
+  providerKey: string,
+  payload: { text: string; voice_id: string; output_format?: string; params?: Record<string, unknown> },
+): Promise<Blob> {
+  const response = await apiFetch(`/providers/${encodeURIComponent(providerKey)}/preview`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) {
+    let detail = `${response.status}`;
+    try {
+      const data = (await response.json()) as { detail?: string };
+      if (data.detail) detail = data.detail;
+    } catch {
+      /* not JSON */
+    }
+    throw new Error(detail);
+  }
+  return response.blob();
+}

@@ -87,24 +87,14 @@ Cancel-the-whole-batch and per-row cancel rely on existing per-row queue/cancel 
 
 **Risk and migration.** Pure addition. New artifact kind needs an enum migration but no destructive change.
 
-### 4. Inline single-row preview
+### 4. Inline single-row preview — **shipped**
 
-**Why it matters.** Cloud TTS providers charge per character; OSS local engines aren't free either (CPU/GPU time, warmup). Today, the only way to hear a row is to enqueue a full job. A 1-row preview is fast feedback and saves quota.
+Implemented in `routes_providers.py::preview_arbitrary_text` + `previewRowSynthesis` API helper + per-row "Preview" button in the script editor.
 
-**What changes.**
-
-- New endpoint `POST /v1/preview` that accepts `{ text, voice, params }`, runs synchronously in the API process (or fast queue if cloud-bound) with a hard timeout (≈ 15 s), and streams the audio back as the response body.
-- Preview results bypass `synthesis_jobs` — they're not stored in the artifact catalog.
-- Frontend: each row in the editor gets a small "Preview" button. Hover state + skeleton while waiting; auto-stops if the user moves on.
-
-**Acceptance criteria.**
-
-- Preview returns audio in < 15 s for cloud TTS providers; for OSS engines, preview either succeeds within 30 s or returns 504.
-- Preview never creates a `synthesis_jobs` row.
-- Rate-limit applies to preview the same way it applies to other endpoints (`RATE_LIMIT_PER_MINUTE`).
-- Preview audio is never written to disk (in-memory only, response stream).
-
-**Risk and migration.** New endpoint, additive.
+- `POST /v1/providers/{provider_key}/preview` accepts `{text, voice_id, output_format?, params?}` and streams the synthesized audio back. No `synthesis_jobs` row, no artifact write, no DB persistence.
+- Length cap via `PREVIEW_MAX_CHARS` (default 500). Returns 413 over the cap.
+- Rate-limit reuses the existing token bucket (`RATE_LIMIT_PER_MINUTE`).
+- Frontend: each row in `ScriptEditor` shows a "Preview" button next to the artifact cell. Result is rendered with `<audio controls src=blob:...>` and the blob URL is revoked when the page unmounts.
 
 ### 5. Project export bundle
 

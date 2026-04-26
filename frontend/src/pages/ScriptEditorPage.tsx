@@ -4,6 +4,7 @@ import {
   downloadProjectArtifactsZip,
   fetchProjectRows,
   mergeProjectRows,
+  previewRowSynthesis,
   queueProjectRows,
   replaceProjectRows,
 } from "../api";
@@ -88,6 +89,9 @@ const COPY: Record<Locale, Record<string, string>> = {
     bulkImport: "Import .txt / .csv",
     downloadZip: "Download all .zip",
     downloadZipEmpty: "No completed rows to download",
+    preview: "Preview",
+    previewing: "Generating…",
+    previewError: "Preview failed",
     mergeCompleted: "Merge completed",
     mergeFormat: "Merge format",
     silence: "Silence ms",
@@ -144,6 +148,9 @@ const COPY: Record<Locale, Record<string, string>> = {
     bulkImport: "Nhập .txt / .csv",
     downloadZip: "Tải tất cả .zip",
     downloadZipEmpty: "Chưa có dòng nào hoàn tất để tải",
+    preview: "Nghe thử",
+    previewing: "Đang tạo…",
+    previewError: "Nghe thử lỗi",
     mergeCompleted: "Nối các dòng đã xong",
     mergeFormat: "Định dạng master",
     silence: "Khoảng lặng ms",
@@ -267,6 +274,9 @@ export const ScriptEditorPage = memo(function ScriptEditorPage({
   const [mergeSilenceMs, setMergeSilenceMs] = useState(150);
   const [masterArtifactUrl, setMasterArtifactUrl] = useState<string | null>(null);
   const [bulkImportOpen, setBulkImportOpen] = useState(false);
+  const [previewBlobUrls, setPreviewBlobUrls] = useState<Record<string, string>>({});
+  const [previewBusyId, setPreviewBusyId] = useState<string | null>(null);
+  const [previewErrors, setPreviewErrors] = useState<Record<string, string>>({});
 
   const project = useMemo(
     () => projects.find((item) => item.project_key === activeProjectKey) ?? null,
@@ -474,6 +484,45 @@ export const ScriptEditorPage = memo(function ScriptEditorPage({
   }, [activeProjectKey, copy.queueError]);
 
   const completedCount = useMemo(() => rows.filter((row) => row.status === "succeeded").length, [rows]);
+
+  const handlePreviewRow = useCallback(
+    async (row: DraftRow) => {
+      if (!row.provider_key || !row.provider_voice_id || !row.source_text.trim()) return;
+      setPreviewBusyId(row.local_id);
+      setPreviewErrors((prev) => {
+        if (!(row.local_id in prev)) return prev;
+        const next = { ...prev };
+        delete next[row.local_id];
+        return next;
+      });
+      try {
+        const blob = await previewRowSynthesis(row.provider_key, {
+          text: row.source_text,
+          voice_id: row.provider_voice_id,
+        });
+        const url = URL.createObjectURL(blob);
+        setPreviewBlobUrls((prev) => {
+          const previous = prev[row.local_id];
+          if (previous) URL.revokeObjectURL(previous);
+          return { ...prev, [row.local_id]: url };
+        });
+      } catch (err) {
+        const detail = err instanceof Error ? err.message : copy.previewError;
+        setPreviewErrors((prev) => ({ ...prev, [row.local_id]: detail }));
+      } finally {
+        setPreviewBusyId(null);
+      }
+    },
+    [copy.previewError],
+  );
+
+  useEffect(() => {
+    return () => {
+      Object.values(previewBlobUrls).forEach((url) => URL.revokeObjectURL(url));
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
 
   const queueRows = useCallback(
     async (mode: "selected" | "enabled", mergeOutputs = false) => {
@@ -885,6 +934,26 @@ export const ScriptEditorPage = memo(function ScriptEditorPage({
                           ) : (
                             <span className="muted-copy">{copy.previewUnavailable}</span>
                           )}
+                          {row.provider_key && row.provider_voice_id && row.source_text.trim() ? (
+                            <div className="script-output-stack" style={{ marginTop: "0.4rem" }}>
+                              <button
+                                type="button"
+                                className="ghost-button compact-button"
+                                onClick={() => void handlePreviewRow(row)}
+                                disabled={previewBusyId === row.local_id}
+                              >
+                                {previewBusyId === row.local_id ? copy.previewing : copy.preview}
+                              </button>
+                              {previewBlobUrls[row.local_id] ? (
+                                <audio controls src={previewBlobUrls[row.local_id]} />
+                              ) : null}
+                              {previewErrors[row.local_id] ? (
+                                <small className="muted-copy block-copy">
+                                  {copy.previewError}: {previewErrors[row.local_id]}
+                                </small>
+                              ) : null}
+                            </div>
+                          ) : null}
                         </td>
                         <td>
                           {!row.provider_key || !row.provider_voice_id ? (

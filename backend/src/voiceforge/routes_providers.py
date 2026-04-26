@@ -2,6 +2,7 @@ from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import Response
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from .config import settings
@@ -75,6 +76,13 @@ def get_provider_voices(provider_key: str, db: Session = Depends(get_db)) -> lis
     return [_serialize_voice(provider, voice) for voice in provider.list_voices()]
 
 
+def _enforce_preview_length(text: str) -> str:
+    cap = settings.preview_max_chars
+    if len(text) > cap:
+        raise HTTPException(status_code=413, detail=f"Preview text exceeds limit ({len(text)} > {cap} chars)")
+    return text
+
+
 @router.get("/{provider_key}/voices/{voice_id:path}/preview")
 def preview_provider_voice(
     provider_key: str, voice_id: str, text: str | None = Query(default=None), db: Session = Depends(get_db)
@@ -91,9 +99,48 @@ def preview_provider_voice(
         raise HTTPException(status_code=404, detail=f"Voice not found: {voice_id}")
 
     serialized = _serialize_voice(provider, voice)
-    sample_text = text or _preview_text_for_voice(serialized)
+    sample_text = _enforce_preview_length(text or _preview_text_for_voice(serialized))
     try:
         result = provider.synthesize(text=sample_text, voice_id=voice_id, output_format="wav", params={})
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+    return Response(content=result.audio_bytes, media_type=result.mime_type)
+
+
+class PreviewSynthesisRequest(BaseModel):
+    text: str = Field(..., min_length=1)
+    voice_id: str = Field(..., min_length=1)
+    output_format: str = "wav"
+    params: dict = Field(default_factory=dict)
+
+
+@router.post("/{provider_key}/preview")
+def preview_arbitrary_text(
+    provider_key: str,
+    payload: PreviewSynthesisRequest,
+    db: Session = Depends(get_db),
+):
+    """Synthesize on demand without persisting a job or artifact (T1.4).
+
+    Use case: previewing a single script row before queueing a batch.
+    The audio bytes are returned directly; nothing is written to disk
+    or the database.
+    """
+    apply_provider_settings(db)
+    try:
+        provider = get_provider(provider_key)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+    text = _enforce_preview_length(payload.text)
+    try:
+        result = provider.synthesize(
+            text=text,
+            voice_id=payload.voice_id,
+            output_format=payload.output_format,
+            params=payload.params,
+        )
     except Exception as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
 

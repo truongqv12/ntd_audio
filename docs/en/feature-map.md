@@ -120,6 +120,8 @@ flowchart TB
 | T1.1 — Bulk import TXT/CSV (`POST /v1/projects/{key}/rows/bulk`) | ✅ | `routes_project_rows.py`, `services_bulk_import.py` |
 | T1.1 — Project artifacts zip (`GET /v1/projects/{key}/rows/artifacts.zip`) | ✅ | `routes_project_rows.py::download_artifacts_zip` |
 | T1.1 — `BulkImportDialog` modal in the script editor | ✅ | `frontend/src/components/BulkImportDialog.tsx` |
+| T1.4 — On-demand single-row preview (`POST /v1/providers/{key}/preview`) | ✅ | `routes_providers.py::preview_arbitrary_text` |
+
 
 ## Roadmap
 
