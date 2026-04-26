@@ -1,16 +1,21 @@
 from __future__ import annotations
 
+import io
+import re
 import subprocess
 import tempfile
+import zipfile
+from collections.abc import Iterator
 from datetime import datetime
 from pathlib import Path
 from urllib.parse import quote
 
-from sqlalchemy import delete, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
 from .models import Project, ProjectScriptRow, SynthesisJob, VoiceCatalogEntry
 from .schemas import (
+    BulkImportResponse,
     JobResponse,
     ProjectBatchQueueResponse,
     ProjectMergeResponse,
@@ -19,6 +24,7 @@ from .schemas import (
     QueueProjectRowsRequest,
     UpsertProjectRowsRequest,
 )
+from .services_bulk_import import ParsedRow
 from .services_jobs import _build_cache_key, serialize_job
 from .services_projects import ensure_project
 from .storage import artifact_absolute_path, write_artifact
@@ -233,3 +239,98 @@ def merge_project_rows(db: Session, project_key: str, payload: QueueProjectRowsR
         output_format=output_format,
         download_url=f"/projects/{project.project_key}/merged-artifact?path={quote(relative_path, safe='')}",
     )
+
+
+_SLUG_RE = re.compile(r"[^A-Za-z0-9]+")
+
+
+def _slugify(text: str, *, max_len: int = 40) -> str:
+    cleaned = _SLUG_RE.sub("-", text).strip("-").lower()
+    if not cleaned:
+        cleaned = "row"
+    return cleaned[:max_len].rstrip("-") or "row"
+
+
+def bulk_import_rows(
+    db: Session,
+    project_key: str,
+    parsed_rows: list[ParsedRow],
+    *,
+    default_provider_key: str | None = None,
+    default_voice_id: str | None = None,
+) -> tuple[Project, list[ProjectScriptRow]]:
+    """Append parsed rows to a project. Caller is responsible for triggering jobs."""
+    project = ensure_project(db, project_key)
+    next_index = (
+        db.scalar(
+            select(func.coalesce(func.max(ProjectScriptRow.row_index), -1)).where(
+                ProjectScriptRow.project_id == project.id
+            )
+        )
+        or -1
+    ) + 1
+
+    inserted: list[ProjectScriptRow] = []
+    for offset, parsed in enumerate(parsed_rows):
+        row = ProjectScriptRow(
+            project_id=project.id,
+            row_index=next_index + offset,
+            title=parsed.title,
+            source_text=parsed.text,
+            provider_key=default_provider_key,
+            provider_voice_id=parsed.provider_voice_id or default_voice_id,
+            output_format=None,
+            params={},
+            is_enabled=True,
+            join_to_master=True,
+            status="draft",
+        )
+        db.add(row)
+        inserted.append(row)
+    db.commit()
+    for row in inserted:
+        db.refresh(row)
+    return project, inserted
+
+
+def bulk_import_to_response(project: Project, rows: list[ProjectScriptRow]) -> BulkImportResponse:
+    return BulkImportResponse(
+        project_key=project.project_key,
+        inserted=len(rows),
+        rows=[_serialize_row(project, row) for row in rows],
+    )
+
+
+def stream_artifacts_zip(
+    db: Session, project_key: str, *, status_filter: str | None = "succeeded"
+) -> Iterator[bytes] | None:
+    """Stream a zip of all artifacts for a project. Returns None if project missing."""
+    project = db.scalar(select(Project).where(Project.project_key == project_key))
+    if not project:
+        return None
+
+    stmt = (
+        select(ProjectScriptRow)
+        .where(
+            ProjectScriptRow.project_id == project.id,
+            ProjectScriptRow.last_artifact_relative_path.is_not(None),
+        )
+        .order_by(ProjectScriptRow.row_index.asc())
+    )
+    if status_filter:
+        stmt = stmt.where(ProjectScriptRow.status == status_filter)
+    rows = db.scalars(stmt).all()
+
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, mode="w", compression=zipfile.ZIP_DEFLATED) as archive:
+        for row in rows:
+            assert row.last_artifact_relative_path is not None
+            source = artifact_absolute_path(row.last_artifact_relative_path)
+            if not source.exists():
+                continue
+            ext = source.suffix.lstrip(".") or "wav"
+            slug = _slugify(row.source_text)
+            arcname = f"{project.project_key}_{row.row_index:03d}_{slug}.{ext}"
+            archive.write(source, arcname=arcname)
+    buffer.seek(0)
+    return iter([buffer.getvalue()])

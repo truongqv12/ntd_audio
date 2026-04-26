@@ -113,6 +113,14 @@ flowchart TB
 | Prometheus `/metrics` với pipeline metric single-subscriber | ✅ | `backend/src/voiceforge/observability.py`, `main.py::_metrics_subscriber` |
 | Gauge in-flight seed từ DB + clamp ≥ 0 | ✅ | `main.py::lifespan`, `observability.py::record_job_event` |
 
+## Personal-use roadmap (T1+)
+
+| Tính năng | Trạng thái | Vị trí |
+|---|---|---|
+| T1.1 — Bulk import TXT/CSV (`POST /v1/projects/{key}/rows/bulk`) | ✅ | `routes_project_rows.py`, `services_bulk_import.py` |
+| T1.1 — Project artifacts zip (`GET /v1/projects/{key}/rows/artifacts.zip`) | ✅ | `routes_project_rows.py::download_artifacts_zip` |
+| T1.1 — Modal `BulkImportDialog` trong script editor | ✅ | `frontend/src/components/BulkImportDialog.tsx` |
+
 ## Roadmap
 
 Rationale đầy đủ, acceptance criteria, và ghi chú migration cho mỗi mục có trong [`optimization-and-roadmap.md`](optimization-and-roadmap.md). Bảng dưới đây là index ngắn.

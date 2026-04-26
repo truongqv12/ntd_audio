@@ -113,6 +113,14 @@ flowchart TB
 | Prometheus `/metrics` with single-subscriber metric pipeline | ✅ | `backend/src/voiceforge/observability.py`, `main.py::_metrics_subscriber` |
 | In-flight gauge seeded from DB + clamped to ≥ 0 | ✅ | `main.py::lifespan`, `observability.py::record_job_event` |
 
+## Personal-use roadmap (T1+)
+
+| Feature | Status | Where |
+|---|---|---|
+| T1.1 — Bulk import TXT/CSV (`POST /v1/projects/{key}/rows/bulk`) | ✅ | `routes_project_rows.py`, `services_bulk_import.py` |
+| T1.1 — Project artifacts zip (`GET /v1/projects/{key}/rows/artifacts.zip`) | ✅ | `routes_project_rows.py::download_artifacts_zip` |
+| T1.1 — `BulkImportDialog` modal in the script editor | ✅ | `frontend/src/components/BulkImportDialog.tsx` |
+
 ## Roadmap
 
 For the full rationale, acceptance criteria, and migration notes for each item, see [`optimization-and-roadmap.md`](optimization-and-roadmap.md). The table below is a short index.

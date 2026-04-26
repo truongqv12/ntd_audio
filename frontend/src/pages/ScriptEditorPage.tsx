@@ -1,11 +1,13 @@
 import { memo, useCallback, useEffect, useMemo, useState } from "react";
 import {
   artifactUrl,
+  downloadProjectArtifactsZip,
   fetchProjectRows,
   mergeProjectRows,
   queueProjectRows,
   replaceProjectRows,
 } from "../api";
+import { BulkImportDialog } from "../components/BulkImportDialog";
 import { Panel } from "../components/Panel";
 import { StatusBadge } from "../components/StatusBadge";
 import { VoiceAvatar } from "../components/VoiceAvatar";
@@ -83,6 +85,9 @@ const COPY: Record<Locale, Record<string, string>> = {
     queueSelected: "Queue selected",
     queueEnabled: "Queue enabled rows",
     queueAndMerge: "Queue enabled + merge",
+    bulkImport: "Import .txt / .csv",
+    downloadZip: "Download all .zip",
+    downloadZipEmpty: "No completed rows to download",
     mergeCompleted: "Merge completed",
     mergeFormat: "Merge format",
     silence: "Silence ms",
@@ -136,6 +141,9 @@ const COPY: Record<Locale, Record<string, string>> = {
     queueSelected: "Render dòng đã chọn",
     queueEnabled: "Render các dòng bật",
     queueAndMerge: "Render dòng bật + nối",
+    bulkImport: "Nhập .txt / .csv",
+    downloadZip: "Tải tất cả .zip",
+    downloadZipEmpty: "Chưa có dòng nào hoàn tất để tải",
     mergeCompleted: "Nối các dòng đã xong",
     mergeFormat: "Định dạng master",
     silence: "Khoảng lặng ms",
@@ -258,6 +266,7 @@ export const ScriptEditorPage = memo(function ScriptEditorPage({
   const [mergeFormat, setMergeFormat] = useState("wav");
   const [mergeSilenceMs, setMergeSilenceMs] = useState(150);
   const [masterArtifactUrl, setMasterArtifactUrl] = useState<string | null>(null);
+  const [bulkImportOpen, setBulkImportOpen] = useState(false);
 
   const project = useMemo(
     () => projects.find((item) => item.project_key === activeProjectKey) ?? null,
@@ -447,6 +456,25 @@ export const ScriptEditorPage = memo(function ScriptEditorPage({
     });
   }, []);
 
+  const downloadZip = useCallback(async () => {
+    try {
+      setError(null);
+      const blob = await downloadProjectArtifactsZip(activeProjectKey);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${activeProjectKey}-artifacts.zip`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : copy.queueError);
+    }
+  }, [activeProjectKey, copy.queueError]);
+
+  const completedCount = useMemo(() => rows.filter((row) => row.status === "succeeded").length, [rows]);
+
   const queueRows = useCallback(
     async (mode: "selected" | "enabled", mergeOutputs = false) => {
       try {
@@ -613,6 +641,22 @@ export const ScriptEditorPage = memo(function ScriptEditorPage({
           <div className="script-action-bar">
             <button type="button" className="ghost-button compact-button" onClick={addRow}>
               {copy.addRow}
+            </button>
+            <button
+              type="button"
+              className="ghost-button compact-button"
+              onClick={() => setBulkImportOpen(true)}
+            >
+              {copy.bulkImport}
+            </button>
+            <button
+              type="button"
+              className="ghost-button compact-button"
+              onClick={() => void downloadZip()}
+              disabled={completedCount === 0}
+              title={completedCount === 0 ? copy.downloadZipEmpty : undefined}
+            >
+              {copy.downloadZip}
             </button>
             <button
               type="button"
@@ -915,6 +959,16 @@ export const ScriptEditorPage = memo(function ScriptEditorPage({
         selectedVoice={selectedVoiceForPicker}
         onClose={() => setPickerTarget(null)}
         onSelectVoice={handleVoiceSelected}
+      />
+
+      <BulkImportDialog
+        open={bulkImportOpen}
+        projectKey={activeProjectKey}
+        onClose={() => setBulkImportOpen(false)}
+        onImported={(response) => {
+          setMessage(`+${response.inserted}`);
+          void loadRows(activeProjectKey, true);
+        }}
       />
     </>
   );
