@@ -59,7 +59,12 @@ Add-Content -Path $pkgPath -Value "" -Encoding utf8
 # Rotate CHANGELOG [Unreleased] -> [NEW] - <date>.
 $Today = Get-Date -Format "yyyy-MM-dd"
 $cl = Get-Content "CHANGELOG.md" -Raw
-$cl = $cl -replace [regex]::Escape("## [Unreleased]"), "## [Unreleased]`n`n## [${New}] - ${Today}", 1
+# PowerShell's -replace operator only takes (pattern, replacement) — there is no
+# "count" parameter like Python's re.sub(..., count=1). A trailing `, 1` would
+# be parsed as the array-construction operator and corrupt the file. There is
+# only ever one `## [Unreleased]` heading in the file so a global replace is
+# equivalent to "first match" here.
+$cl = $cl -replace [regex]::Escape("## [Unreleased]"), "## [Unreleased]`n`n## [${New}] - ${Today}"
 $cl += "[${New}]: https://github.com/truongqv12/ntd_audio/releases/tag/v${New}`n"
 Set-Content -Path "CHANGELOG.md" -Value $cl -NoNewline
 
