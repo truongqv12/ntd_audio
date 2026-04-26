@@ -6,6 +6,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **Wired `ArtifactStorage` into `write_artifact` (T2.8).** The legacy `storage.py::write_artifact` now delegates to `services.storage.get_storage().write_bytes(...)` instead of writing to the local filesystem directly. Operators who set `STORAGE_BACKEND=s3` (or simply re-target `ARTIFACT_ROOT` to a NAS / external HDD) finally get the bytes routed through the abstraction. The function's contract `(relative_key, size, sha256_hex)` is unchanged. Reads (`artifact_absolute_path` + `FileResponse`) remain local-fs only — adding S3 read / redirect support is a separate piece.
+
 ### Added
 - **Bulk import script rows from TXT/CSV (T1.1).** `POST /v1/projects/{key}/rows/bulk` accepts a multipart upload (`format=txt|csv`). TXT supports line-per-row or blank-line paragraph splitting; CSV supports configurable text/voice/speaker/title columns. Rows are appended (existing `row_index` is preserved). Optional `auto_enqueue=true` queues all imported rows immediately. Limits enforced via `BULK_IMPORT_MAX_ROWS` (default 5000) and `BULK_IMPORT_MAX_BYTES` (default 5 MiB). The `BulkImportDialog` modal in the script editor wraps it (file picker, format toggle, CSV column overrides, default provider/voice fields, auto-enqueue toggle).
 - **Project artifacts zip download (T1.1).** `GET /v1/projects/{key}/rows/artifacts.zip?status=succeeded` streams a deflate-compressed zip of every completed row's artifact, named `{key}_{idx:03d}_{slug}.{ext}`. Surface in the script editor as "Download all .zip" (disabled when no completed rows).

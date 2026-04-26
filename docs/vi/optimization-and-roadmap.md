@@ -138,25 +138,13 @@ Nếu scale bằng nhiều worker process (vd `dramatiq voiceforge.tasks --proce
 
 Bản tiếp theo có thể thêm Settings → "Performance" panel để persist override trong `app_settings`. Hiện chưa làm — env-driven đã đủ cho personal-use.
 
-### 8. Wire `ArtifactStorage` vào `write_artifact`
+### 8. Wire `ArtifactStorage` vào `write_artifact` — **đã ship (write path)**
 
-**Vì sao quan trọng.** Kể cả install cá nhân, user thường muốn artifact ghi vào NAS, ổ ngoài, hoặc bucket S3-compatible trên home server (MinIO). Hôm nay, `STORAGE_BACKEND=s3` là no-op cho artifact mới vì đường ghi cũ bypass Protocol `ArtifactStorage`. Theo `self-hosting.md` set env vars sẽ ra setup hỏng âm thầm.
+`storage.py::write_artifact` giờ delegate vào `services.storage.get_storage().write_bytes(...)`. Operator set `STORAGE_BACKEND=s3` (hoặc re-target `ARTIFACT_ROOT` qua NAS / ổ ngoài) cuối cùng thấy bytes route qua abstraction. Contract `(relative_key, size, sha256_hex)` không đổi.
 
-**Thay đổi gì.**
+Đường đọc (`artifact_absolute_path` + `FileResponse`) vẫn local-fs only. Thêm S3 read / redirect — stream bytes qua FastAPI hoặc trả presigned URL — là follow-up tự nhiên nhưng cố ý out of scope ở đây để PR nhỏ và reviewable.
 
-- Thay call `Path.write_bytes` / `cache_root` trực tiếp trong `services_jobs.process_job` bằng `storage = get_storage(); storage.write_bytes(key, audio_bytes)`.
-- Tương tự cho đường ghi `generation_cache`.
-- Migrate đường đọc đọc qua abstraction.
-- Thêm smoke test boot MinIO trong CI và round-trip artifact.
-- Document trong `self-hosting.md` rằng migration local → S3 cho artifact hiện hữu yêu cầu `aws s3 sync` (không copy tự động lúc boot).
-
-**Acceptance criteria.**
-
-- `STORAGE_BACKEND=s3` cộng `S3_*` env vars khiến job mới ghi vào bucket; download stream từ bucket; không gì chạm `ARTIFACT_ROOT`.
-- `STORAGE_BACKEND=local` tiếp tục hoạt động bit-for-bit như cũ.
-- Integration test mới pass với MinIO trong CI.
-
-**Rủi ro và migration.** Install `local` hiện hữu không bị ảnh hưởng (default không đổi).
+Migration tree artifact local hiện hữu sang S3 vẫn cần `aws s3 sync` ngoài luồng (không copy tự động lúc boot).
 
 ---
 
