@@ -337,6 +337,26 @@ export async function downloadProjectArtifactsZip(
   return response.blob();
 }
 
+export async function downloadProjectSubtitles(
+  projectKey: string,
+  fileFormat: "srt" | "vtt" = "srt",
+  silenceMs: number = 150,
+): Promise<Blob> {
+  const params = new URLSearchParams({ format: fileFormat, silence_ms: String(silenceMs) });
+  const response = await apiFetch(`/projects/${projectKey}/rows/subtitles?${params.toString()}`);
+  if (!response.ok) {
+    let detail = `${response.status}`;
+    try {
+      const data = (await response.json()) as { detail?: string };
+      if (data.detail) detail = data.detail;
+    } catch {
+      /* not JSON */
+    }
+    throw new Error(detail);
+  }
+  return response.blob();
+}
+
 export async function fetchHealth(): Promise<HealthResponse> {
   const response = await apiFetch(`/health`);
   if (!response.ok) throw new Error("Unable to fetch health");

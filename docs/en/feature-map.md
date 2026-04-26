@@ -134,6 +134,7 @@ flowchart TB
 | Feature | Status | Where |
 |---|---|---|
 | T1.2 — `speaker_label` on script rows (dialogue mode minimum) | ✅ | `models.ProjectScriptRow.speaker_label`, alembic `20260424_0004` |
+| T1.3 — Subtitle download (`.srt` / `.vtt`) | ✅ | `services_subtitles.py`, `routes_project_rows.download_project_subtitles` |
 
 ## Roadmap
 
