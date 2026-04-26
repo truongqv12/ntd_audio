@@ -227,7 +227,15 @@
     "hostCores": "cores",
     "hostThreads": "threads",
     "hostOverlay": "Suggested overlay",
-    "hostLoading": "Probing host…"
+    "hostLoading": "Probing host…",
+    "systemDescription": "This page should become the home of diagnostics and environment-level settings.",
+    "retentionTitle": "Retention",
+    "retentionDescription": "Delete completed jobs older than N days. Preview first, then confirm.",
+    "retentionDaysLabel": "Older than (days)",
+    "retentionPreviewButton": "Preview",
+    "retentionPurgeButton": "Delete now",
+    "retentionPreviewSummary": "{jobs} jobs · {artifacts} artifacts · {mb} MB on disk",
+    "retentionEmpty": "Nothing matches the current window."
   },
   "voiceLab": {
     "title": "Voice Lab",

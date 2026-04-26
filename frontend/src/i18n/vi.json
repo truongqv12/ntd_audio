@@ -227,7 +227,15 @@
     "hostCores": "core",
     "hostThreads": "thread",
     "hostOverlay": "Overlay gợi ý",
-    "hostLoading": "Đang probe host…"
+    "hostLoading": "Đang probe host…",
+    "systemDescription": "Trang này nên trở thành nơi tập trung diagnostics và thiết lập môi trường.",
+    "retentionTitle": "Retention",
+    "retentionDescription": "Xóa job đã hoàn thành cũ hơn N ngày. Preview trước, sau đó xác nhận.",
+    "retentionDaysLabel": "Cũ hơn (ngày)",
+    "retentionPreviewButton": "Preview",
+    "retentionPurgeButton": "Xóa ngay",
+    "retentionPreviewSummary": "{jobs} job · {artifacts} artifact · {mb} MB trên disk",
+    "retentionEmpty": "Không có gì khớp với window hiện tại."
   },
   "voiceLab": {
     "title": "Voice Lab",
