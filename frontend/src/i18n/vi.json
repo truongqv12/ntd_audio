@@ -227,7 +227,7 @@
     "hostCores": "core",
     "hostThreads": "thread",
     "hostOverlay": "Overlay gợi ý",
-    "hostLoading": "Đang probe host…"
+    "hostLoading": "Đang probe host…",
     "systemDescription": "Trang này nên trở thành nơi tập trung diagnostics và thiết lập môi trường.",
     "retentionTitle": "Retention",
     "retentionDescription": "Xóa job đã hoàn thành cũ hơn N ngày. Preview trước, sau đó xác nhận.",

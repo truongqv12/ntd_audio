@@ -9,8 +9,8 @@ import type {
 } from "../types";
 import { Panel } from "../components/Panel";
 import { useI18n } from "../i18n";
-import { fetchHostCapabilities, updateMergeDefaults, updateProviderCredentials } from "../api";
 import {
+  fetchHostCapabilities,
   fetchRetentionPreview,
   purgeRetention,
   updateMergeDefaults,
