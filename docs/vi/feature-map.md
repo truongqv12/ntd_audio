@@ -115,6 +115,8 @@ flowchart TB
 
 ## Roadmap
 
+Rationale đầy đủ, acceptance criteria, và ghi chú migration cho mỗi mục có trong [`optimization-and-roadmap.md`](optimization-and-roadmap.md). Bảng dưới đây là index ngắn.
+
 Đây là backlog chưa commit — thứ tự là gợi ý theo impact, không phải cam kết. Vote issue để nhấn ưu tiên.
 
 | Mục | Lý do |

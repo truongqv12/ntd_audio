@@ -25,6 +25,7 @@ Nếu là **người đọc**, bắt đầu từ [`../README.vi.md`](../README.v
 | Engine | [`en/providers.md`](en/providers.md) | [`vi/providers.md`](vi/providers.md) |
 | Phát triển | [`en/development.md`](en/development.md) | [`vi/development.md`](vi/development.md) |
 | Bản đồ tính năng | [`en/feature-map.md`](en/feature-map.md) | [`vi/feature-map.md`](vi/feature-map.md) |
+| Tối ưu & roadmap | [`en/optimization-and-roadmap.md`](en/optimization-and-roadmap.md) | [`vi/optimization-and-roadmap.md`](vi/optimization-and-roadmap.md) |
 | Design system | [`en/design-system.md`](en/design-system.md) | [`vi/design-system.md`](vi/design-system.md) |
 | Đóng góp | [`../CONTRIBUTING.md`](../CONTRIBUTING.md) | [`vi/contributing.md`](vi/contributing.md) |
 | Bảo mật | [`../SECURITY.md`](../SECURITY.md) | [`vi/security.md`](vi/security.md) |

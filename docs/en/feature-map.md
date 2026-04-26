@@ -115,6 +115,8 @@ flowchart TB
 
 ## Roadmap
 
+For the full rationale, acceptance criteria, and migration notes for each item, see [`optimization-and-roadmap.md`](optimization-and-roadmap.md). The table below is a short index.
+
 These are not committed — order is suggestion based on impact, not a guarantee. Vote on issues for ones that matter to your install.
 
 | Item | Why |
