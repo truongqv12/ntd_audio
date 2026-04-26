@@ -1,8 +1,11 @@
 FROM node:20-alpine AS build
 WORKDIR /app
 
-ARG VITE_API_BASE_URL=http://localhost:8000/api/v1
-ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
+# Build-time only. Vite inlines this into the bundle when `npm run build` runs.
+# Runtime `environment:` settings on the frontend service are ignored.
+# Code reads `import.meta.env.VITE_API_BASE` (see `frontend/src/api.ts`).
+ARG VITE_API_BASE=http://localhost:8000
+ENV VITE_API_BASE=$VITE_API_BASE
 
 COPY package.json package-lock.json* ./
 RUN npm ci || npm install

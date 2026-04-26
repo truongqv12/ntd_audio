@@ -1,0 +1,27 @@
+# Force LF line endings for files that are interpreted inside Linux containers
+# or by shells that don't tolerate CRLF. Without this, a Windows clone with
+# core.autocrlf=true silently rewrites these files and breaks docker compose up.
+*.sh             text eol=lf
+*.bash           text eol=lf
+Dockerfile       text eol=lf
+Dockerfile.*     text eol=lf
+*.yml            text eol=lf
+*.yaml           text eol=lf
+.env*            text eol=lf
+Makefile         text eol=lf
+
+# PowerShell is fine with either, but pin CRLF for Windows-native tooling.
+*.ps1            text eol=crlf
+*.bat            text eol=crlf
+*.cmd            text eol=crlf
+
+# Binary blobs: never normalise.
+*.png            binary
+*.jpg            binary
+*.jpeg           binary
+*.gif            binary
+*.ico            binary
+*.wav            binary
+*.mp3            binary
+*.zip            binary
+*.gz             binary

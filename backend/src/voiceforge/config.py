@@ -1,7 +1,8 @@
 from pathlib import Path
+from typing import Annotated
 
 from pydantic import Field, field_validator
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 
 def _read_version_file() -> str:
@@ -20,11 +21,15 @@ class Settings(BaseSettings):
     api_host: str = Field(default="0.0.0.0", alias="API_HOST")
     api_port: int = Field(default=8000, alias="API_PORT")
 
-    app_allowed_origins: list[str] = Field(
+    # NoDecode keeps pydantic-settings from JSON-decoding the env value before our
+    # `mode="before"` validator runs — so the CSV form documented in `.env.example`
+    # (e.g. `APP_ALLOWED_ORIGINS=http://localhost:5173,http://localhost:4173`) works.
+    # Without NoDecode, list[str] fields force JSON like `["http://..."]` only.
+    app_allowed_origins: Annotated[list[str], NoDecode] = Field(
         default_factory=lambda: ["http://localhost:5173"],
         alias="APP_ALLOWED_ORIGINS",
     )
-    app_api_keys: list[str] = Field(default_factory=list, alias="APP_API_KEYS")
+    app_api_keys: Annotated[list[str], NoDecode] = Field(default_factory=list, alias="APP_API_KEYS")
 
     database_url: str = Field(
         default="postgresql+psycopg://postgres:postgres@postgres:5432/voiceforge",

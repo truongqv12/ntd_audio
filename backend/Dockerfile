@@ -10,7 +10,6 @@ RUN pip install --no-cache-dir -r /app/requirements.txt
 COPY alembic.ini /app/alembic.ini
 COPY alembic /app/alembic
 COPY src /app/src
-COPY catalogs /app/catalogs
 
 ENV PYTHONPATH=/app/src
 
