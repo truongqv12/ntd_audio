@@ -211,5 +211,4 @@ Toàn bộ cấu hình điều khiển bằng biến môi trường. Tham khảo
 
 - **Auth multi-user.** Hiện một CSV `APP_API_KEYS` chia sẻ chung cho cả API; chưa có model user hay workspace isolation.
 - **Worker scaling.** Dramatiq hỗ trợ nhiều replica, nhưng priority queue, dead-letter, và per-project concurrency cap chưa làm.
-- **GC storage.** Artifact cũ không tự dọn.
 - **Telemetry.** Không thu thập số liệu sử dụng ẩn danh.

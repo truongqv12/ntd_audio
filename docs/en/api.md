@@ -19,7 +19,7 @@ flowchart LR
   client([Client]) -->|/v1/jobs| api[FastAPI]
   client -->|/jobs<br/>legacy| api
   api --> handler[Handler]
-  api -. add Deprecation: true header .-> client_legacy
+  api -. add Deprecation: true header .-> client
 ```
 
 - All new endpoints land under `/v1`. The legacy mounts share handlers — they're aliases, not parallel implementations.
@@ -75,6 +75,7 @@ Full reference at `/docs`. Below is the operator's mental model.
 | `POST` | `/v1/jobs` | Create + enqueue. Returns `id` and `status=queued`. |
 | `GET` | `/v1/jobs` | Paginated list. Query: `limit`, `offset`, `status`, `provider_key`, `project_key`, `q`. |
 | `GET` | `/v1/jobs/{id}` | Job detail with artifacts and recent events. |
+| `GET` | `/v1/jobs/{id}/artifact` | Stream the audio artifact. |
 | `POST` | `/v1/jobs/{id}/cancel` | Allowed while `queued`/`running`. Worker re-checks before each terminal write. |
 | `POST` | `/v1/jobs/{id}/retry` | Re-enqueues a `failed`/`canceled` job using the original input. |
 
@@ -85,12 +86,24 @@ Full reference at `/docs`. Below is the operator's mental model.
 | `GET` | `/v1/projects` | List with stats. |
 | `POST` | `/v1/projects` | Create. |
 | `GET` | `/v1/projects/{key}` | Detail. |
-| `PATCH` | `/v1/projects/{key}` | Update name / description / defaults / tags. |
-| `POST` | `/v1/projects/{key}/archive` | Archive (soft delete; jobs retained). |
-| `GET` | `/v1/projects/{key}/rows` | Script Editor rows. |
-| `PUT` | `/v1/projects/{key}/rows` | Replace rows in bulk. |
-| `POST` | `/v1/projects/{key}/queue-rows` | Enqueue jobs for selected rows. |
-| `POST` | `/v1/projects/{key}/merge` | Build the master audio from completed rows. |
+| `PATCH` | `/v1/projects/{key}` | Update name / description / defaults / tags / archive flag. |
+| `GET` | `/v1/projects/{key}/merged-artifact` | Stream the project's master mix-down. |
+| `GET` | `/v1/projects/{key}/export.zip` | T1.5 — download a project bundle (audio + script + voice-map + originals). |
+
+### Project script rows
+
+All routes mounted under `/v1/projects/{key}/rows`.
+
+| Method | Path | Notes |
+|---|---|---|
+| `GET` | `/v1/projects/{key}/rows` | Script Editor rows in display order. |
+| `PUT` | `/v1/projects/{key}/rows` | Replace rows in bulk (Script Editor save). |
+| `POST` | `/v1/projects/{key}/rows/queue` | Enqueue jobs for selected rows (was `/queue-rows`). |
+| `POST` | `/v1/projects/{key}/rows/merge` | Build the master audio from completed rows (was `/merge`). |
+| `POST` | `/v1/projects/{key}/rows/bulk` | T1.1 — bulk import from `multipart/form-data` (`file=*.txt\|*.csv`). |
+| `GET` | `/v1/projects/{key}/rows/artifacts.zip` | T1.1 — download all completed rows' artifacts as a single zip. |
+| `GET` | `/v1/projects/{key}/rows/subtitles` | T1.3 — download `.srt` or `.vtt` for the project. Query: `format=srt\|vtt`, `silence_ms`, `only_completed`. |
+| `GET` | `/v1/projects/{key}/rows/{row_id}/artifact` | Stream a single row's audio. |
 
 ### Catalog
 
@@ -98,15 +111,41 @@ Full reference at `/docs`. Below is the operator's mental model.
 |---|---|---|
 | `GET` | `/v1/catalog/voices` | All providers' voices, paginated. |
 | `GET` | `/v1/catalog/voices/search` | Server-side search by query, language, locale. |
-| `POST` | `/v1/catalog/refresh` | Trigger a catalog refresh in the background. |
+
+### Providers
+
+| Method | Path | Notes |
+|---|---|---|
+| `GET` | `/v1/providers` | Provider summaries (status, available voices, capabilities). |
+| `GET` | `/v1/providers/{key}/voices` | Voices for a single provider. |
+| `GET` | `/v1/providers/{key}/voices/{voice_id}/preview` | Stream the catalog-provided voice sample. |
+| `POST` | `/v1/providers/{key}/preview` | T1.4 — synthesize one ad-hoc text snippet without enqueuing a job. |
 
 ### Settings
 
 | Method | Path | Notes |
 |---|---|---|
-| `GET` | `/v1/settings/{namespace}` | Read settings. Secrets are masked. |
-| `PUT` | `/v1/settings/{namespace}/{key}` | Upsert. Encrypts when `is_secret=true` and `APP_ENCRYPTION_KEY` is set. |
-| `GET` | `/v1/settings/schemas` | Per-provider parameter schemas. |
+| `GET` | `/v1/settings` | Overview: redacted credentials, voice-parameter schemas, merge defaults. |
+| `GET` | `/v1/settings/provider-credentials` | List redacted provider credentials. |
+| `PUT` | `/v1/settings/provider-credentials/{provider_key}` | Upsert. Encrypted with Fernet when `APP_ENCRYPTION_KEY` is set. |
+| `GET` | `/v1/settings/voice-parameter-schemas` | All providers' parameter schemas. |
+| `GET` | `/v1/settings/voice-parameter-schemas/{provider_key}` | Single-provider schema. |
+| `PATCH` | `/v1/settings/merge-defaults` | Update default merge format/silence/etc. |
+
+### System and admin
+
+| Method | Path | Notes |
+|---|---|---|
+| `GET` | `/v1/system/capabilities` | T2.6 — host probe (CPU count, GPU presence, NVML data, memory). |
+| `GET` | `/v1/admin/retention/preview` | T3.10 — dry-run: how many jobs/artifacts would a purge remove. |
+| `POST` | `/v1/admin/retention/purge` | T3.10 — actually delete jobs older than the given threshold. |
+
+### Real-time and events
+
+| Method | Path | Notes |
+|---|---|---|
+| `GET` | `/v1/events/snapshot` | One-shot current state (jobs + projects + recent events). |
+| `GET` | `/v1/events/stream` | Server-Sent Events stream (snapshots + heartbeats). |
 
 ### Health and monitor
 
@@ -114,6 +153,7 @@ Full reference at `/docs`. Below is the operator's mental model.
 |---|---|---|
 | `GET` | `/health` | Liveness/readiness. Includes provider reachability. **Unauthenticated.** |
 | `GET` | `/v1/monitor/status` | Aggregated provider health + active job counts. |
+| `GET` | `/v1/monitor/log-sources` | List of available log sources. |
 | `GET` | `/v1/monitor/logs?source=api\|worker\|<engine>` | Tail logs. Engine sources only available when the Docker socket is mounted. |
 | `GET` | `/metrics` | Prometheus exposition. Unauthenticated; restrict at the proxy. |
 

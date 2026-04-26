@@ -88,7 +88,7 @@ Triển khai trong `routes_providers.py::preview_arbitrary_text` + helper `previ
 
 Panel merge có nút "Export project (.zip)" cạnh "Merge completed".
 
-`subtitles/` và file TXT/CSV gốc vẫn trong wishlist (depend vào T1.3 / T1.1 chưa merge) sẽ thêm khi land. Companion `POST /v1/projects/import` là follow-up tự nhiên — `script.json` đã encode đủ cho round-trip recreate.
+Bổ sung `subtitles/` (giờ T1.3 đã ship) và file TXT/CSV gốc vào export zip vẫn nằm trong wishlist — follow-up nhỏ vì generator cơ sở đã có sẵn. Companion `POST /v1/projects/import` là bước tiếp theo tự nhiên — `script.json` đã encode đủ cho round-trip recreate.
 
 ---
 

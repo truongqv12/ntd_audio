@@ -47,14 +47,24 @@ flowchart TB
   e4 --> e4e[Rate limit]
   e4 --> e4f[Prometheus /metrics]
 
-  nx --> nx1[Wire ArtifactStorage vào write_artifact]
-  nx --> nx2[JWT / multi-user auth]
-  nx --> nx3[Worker scaling + DLQ]
-  nx --> nx4[E2E test]
-  nx --> nx5[Provider plugin system]
-  nx --> nx6[Helm chart]
-  nx --> nx7[Telemetry opt-in]
-  nx --> nx8[Artifact GC]
+  root --> personal[Personal-use roadmap<br/>T1–T3]
+  personal --> p1[T1.1 Bulk import TXT/CSV]
+  personal --> p2[T1.2 Multi-voice / dialogue]
+  personal --> p3[T1.3 Subtitle .srt/.vtt]
+  personal --> p4[T1.4 Inline preview]
+  personal --> p5[T1.5 Project export bundle]
+  personal --> p6[T2.6 GPU/CPU auto-detect]
+  personal --> p7[T2.7 Per-provider concurrency]
+  personal --> p8[T2.8 ArtifactStorage wired]
+  personal --> p9[T3.9 Provider plugin entry points]
+  personal --> p10[T3.10 Retention preview/purge]
+  personal --> p11[T3.11 Playwright smoke harness]
+
+  nx --> nx1[Conversation-mode multi-voice UX]
+  nx --> nx2[Đường đọc S3 / presigned URL]
+  nx --> nx3[Subtitle import + đóng vào export.zip]
+  nx --> nx4[Telemetry device per-engine]
+  nx --> nx5[Lưu override concurrency vào Settings]
 ```
 
 ## Epic 1 — Operational safety
@@ -112,51 +122,39 @@ flowchart TB
 | Token-bucket rate limiter | ✅ | `backend/src/voiceforge/rate_limit.py` |
 | Prometheus `/metrics` với pipeline metric single-subscriber | ✅ | `backend/src/voiceforge/observability.py`, `main.py::_metrics_subscriber` |
 | Gauge in-flight seed từ DB + clamp ≥ 0 | ✅ | `main.py::lifespan`, `observability.py::record_job_event` |
-| T2.6 — Probe capability host (`GET /v1/system/capabilities`) | ✅ | `services_system.py`, `routes_system.py`, Settings → panel Host |
-| T2.8 — `write_artifact` route qua `ArtifactStorage` | ✅ | `storage.py::write_artifact`, `services/storage.py::get_storage` |
-| T3.10 — Retention preview/purge (`/v1/admin/retention/{preview,purge}`) | ✅ | `backend/src/voiceforge/services_retention.py`, `routes_retention.py` |
-| T3.9 — Provider plugin entry points (group `voiceforge.providers`) | ✅ | `backend/src/voiceforge/provider_registry.py` |
-| T3.11 — Harness Playwright smoke (`npm run test:e2e`) | ✅ | `frontend/playwright.config.ts`, `frontend/e2e/smoke.spec.ts` |
-| T1.5 — Bundle export project (`GET /v1/projects/{key}/export.zip`) | ✅ | `services_project_export.py`, `routes_projects.py` |
 
-## Personal-use roadmap (T1+)
+## Personal-use roadmap (T1–T3)
+
+Tất cả mục dưới đây được bổ sung trên Epic 4 để phù hơp hơn với hình dạng triển khai **single-user, single-host Docker**. Xem [`optimization-and-roadmap.md`](optimization-and-roadmap.md) để có acceptance criteria và ghi chú migration gốc.
 
 | Tính năng | Trạng thái | Vị trí |
 |---|---|---|
 | T1.1 — Bulk import TXT/CSV (`POST /v1/projects/{key}/rows/bulk`) | ✅ | `routes_project_rows.py`, `services_bulk_import.py` |
 | T1.1 — Project artifacts zip (`GET /v1/projects/{key}/rows/artifacts.zip`) | ✅ | `routes_project_rows.py::download_artifacts_zip` |
 | T1.1 — Modal `BulkImportDialog` trong script editor | ✅ | `frontend/src/components/BulkImportDialog.tsx` |
-| T1.4 — Preview 1 row on-demand (`POST /v1/providers/{key}/preview`) | ✅ | `routes_providers.py::preview_arbitrary_text` |
-
-
-## Personal-use roadmap (T1+)
-
-| Tính năng | Trạng thái | Vị trí |
-|---|---|---|
-| T2.7 — Concurrency limit per-provider (`PROVIDER_CONCURRENCY`) | ✅ | `services_provider_concurrency.py`, `services_jobs.process_job` |
-
-## Personal-use roadmap (T1+)
-
-| Tính năng | Trạng thái | Vị trí |
-|---|---|---|
 | T1.2 — `speaker_label` trên script row (dialogue mode tối thiểu) | ✅ | `models.ProjectScriptRow.speaker_label`, alembic `20260424_0004` |
-| T1.3 — Tải subtitle (`.srt` / `.vtt`) | ✅ | `services_subtitles.py`, `routes_project_rows.download_project_subtitles` |
+| T1.3 — Subtitle output `.srt` / `.vtt` (`GET /v1/projects/{key}/rows/subtitles`) | ✅ | `services_subtitles.py`, `routes_project_rows.download_project_subtitles` |
+| T1.4 — Preview 1 row on-demand (`POST /v1/providers/{key}/preview`) | ✅ | `routes_providers.py::preview_arbitrary_text` |
+| T1.5 — Bundle export project (`GET /v1/projects/{key}/export.zip`) | ✅ | `services_project_export.py`, `routes_projects.py` |
+| T2.6 — Probe capability host (`GET /v1/system/capabilities`) | ✅ | `services_system.py`, `routes_system.py`, Settings → panel Host |
+| T2.7 — Concurrency limit per-provider (`PROVIDER_CONCURRENCY`) | ✅ | `services_provider_concurrency.py`, `services_jobs.process_job` |
+| T2.8 — `write_artifact` route qua `ArtifactStorage` | ✅ | `storage.py::write_artifact`, `services/storage.py::get_storage` |
+| T3.9 — Provider plugin entry points (group `voiceforge.providers`) | ✅ | `backend/src/voiceforge/provider_registry.py` |
+| T3.10 — Retention preview/purge (`/v1/admin/retention/{preview,purge}`) | ✅ | `backend/src/voiceforge/services_retention.py`, `routes_retention.py` |
+| T3.11 — Harness Playwright smoke (`npm run test:e2e`) | ✅ | `frontend/playwright.config.ts`, `frontend/e2e/smoke.spec.ts` |
 
-## Roadmap
+## Roadmap (backlog mở)
 
-Rationale đầy đủ, acceptance criteria, và ghi chú migration cho mỗi mục có trong [`optimization-and-roadmap.md`](optimization-and-roadmap.md). Bảng dưới đây là index ngắn.
+Rationale đầy đủ, acceptance criteria, và ghi chú migration cho mỗi mục có trong [`optimization-and-roadmap.md`](optimization-and-roadmap.md). Bảng dưới đây là index ngắn cho công việc **chưa** thực hiện.
 
-Đây là backlog chưa commit — thứ tự là gợi ý theo impact, không phải cam kết. Vote issue để nhấn ưu tiên.
+Đây là backlog chưa commit — thứ tự là gợi ý theo impact, không phải cam kết. Các mục multi-user / SaaS (JWT, Helm, telemetry, worker DLQ) cố tình không có mặt ở đây — xem phần "Out of scope" trong `optimization-and-roadmap.md`.
 
 | Mục | Lý do |
 |---|---|
-| **Wire `ArtifactStorage` vào `write_artifact`** | Protocol có sẵn nhưng đường ghi cũ vẫn đụng FS local trực tiếp. Operator set `STORAGE_BACKEND=s3` hôm nay là no-op. |
-| **JWT / multi-user auth** | Gate API-key hiện tại single-tenant. Cài đặt multi-user cần user account, session, audit per-user. |
-| **Primitive scale worker** | Priority queue, dead-letter, per-project concurrency cap, drain-on-deploy. |
-| **End-to-end test** | Bộ smoke Playwright đi qua flow create-job → wait → download trên Compose stack thật. |
-| **Provider plugin system** | Hôm nay thêm provider phải sửa registry. Plugin loader (entry point) cho user ship engine riêng mà không fork. |
-| **Helm chart** | Story deploy Kubernetes first-class. Compose stack map sang gần như 1-1. |
-| **Telemetry ẩn danh (opt-in)** | "Bao nhiêu install chạy engine nào" — feed prioritization. Strict opt-in. |
-| **Garbage collection artifact** | Artifact và cache row cũ tích tụ. Job retention policy có cấu hình. |
+| **Conversation-mode multi-voice UX** | `speaker_label` hôm nay chỉ là string. Panel nặng hơn để map `speaker_label → provider_voice_id` và auto-fill khi thêm row mới vẫn deferred. |
+| **Đường đọc S3 / presigned URL** | T2.8 wire **đường ghi** qua `ArtifactStorage`. Đường đọc (`artifact_absolute_path` + `FileResponse`) vẫn local-fs only. |
+| **Subtitle import + đóng vào export.zip** | Bundle T1.5 chưa kèm `subtitles/` lẫn TXT/CSV gốc. Kèm `POST /v1/projects/import` là follow-up tự nhiên. |
+| **Telemetry device per-engine** | Hôm nay `/v1/system/capabilities` báo cáo thứ mà container **API** thấy. Báo cáo mỗi engine đã load trên device nào (CPU vs CUDA) là mở rộng để mở. |
+| **Lưu override concurrency vào Settings** | Limit T2.7 hiện driven by env. Panel Settings → "Performance" lưu override vào `app_settings` sẽ bớt phải reload env. |
 | **i18n: thêm locale** | JP / ZH / KR là khả năng cao do engine ship. |
 | **Tăng frontend test coverage** | Bộ smoke cố tình nhỏ. Critical path (tạo job, settings, ScriptEditor) đáng có test ở mức component. |

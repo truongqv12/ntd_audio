@@ -20,6 +20,12 @@ erDiagram
   synthesis_jobs ||--o{ synthesis_artifacts : tạo_ra
   synthesis_jobs ||--o{ job_events : timeline
   synthesis_jobs }o--o{ generation_cache : "lookup theo cache_key"
+  app_settings {
+    string namespace
+    string key
+    json value_json
+    bool is_secret
+  }
 
   projects {
     int id PK
@@ -90,6 +96,7 @@ erDiagram
     json params
     bool enabled
     bool join_to_master
+    string speaker_label
   }
 ```
 
@@ -143,7 +150,7 @@ Bảng lookup để hai job giống nhau (cùng text, voice, params, output form
 
 ### `project_script_rows`
 
-Row có thứ tự per-project cho workflow Script Editor. Mỗi row có text riêng, override voice/provider tùy chọn, params, cờ enable, cờ join-to-master.
+Row có thứ tự per-project cho workflow Script Editor. Mỗi row có text riêng, override voice/provider tùy chọn, params, cờ enable, cờ join-to-master, và `speaker_label` tùy chọn (free-text dialogue tag, tối đa 80 ký tự; thêm trong alembic `20260424_0004`). Label được `services_subtitles.py` dùng để prefix cue phụ đề dạng `[Speaker]`.
 
 Index: `project_id`, `row_index`.
 
