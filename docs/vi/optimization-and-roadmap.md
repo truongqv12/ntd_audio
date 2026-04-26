@@ -172,22 +172,18 @@ Trang Settings có panel "Retention" với window "Cũ hơn (ngày)" cấu hình
 
 Flow UI là preview → confirm → delete: nút "Xóa ngay" disable đến khi load được preview non-empty. Job active và recent không bao giờ bị động. Counter `voiceforge_artifacts_pruned_total` và filter theo status là follow-up có chủ ý.
 
-### 11. Playwright smoke E2E
+### 11. Playwright smoke E2E — **đã ship (harness)**
 
-**Vì sao quan trọng.** Vitest cover component cô lập; pytest cover handler. Không cái nào bắt được "tôi import CSV, queue batch, đợi qua SSE, và zip download không có đủ file." Một scenario smoke chặt bắt được class regression rộng.
+`frontend/playwright.config.ts` cùng `frontend/e2e/smoke.spec.ts` ship harness Playwright với smoke UI-only: load SPA, assert brand block visible, confirm sidebar có ít nhất ba nav item. Chạy:
 
-**Thay đổi gì.**
+```bash
+cd frontend
+npm run test:e2e:install   # tải chromium 1 lần
+npm run dev                # ở shell khác
+npm run test:e2e
+```
 
-- Một scenario: **bulk import → run → wait → download zip**. CSV 5 row, 2 voice, output mode "Conversation", expect 5 stem + 1 mixdown + 1 SRT trong zip.
-- Chạy chống stub-provider Compose profile để không phụ thuộc cloud API.
-- CI job mới `frontend-e2e` trên PR chạm `frontend/`, `backend/`, hoặc `engines/`.
-
-**Acceptance criteria.**
-
-- `make e2e` build stack, chạy scenario, tear down. Chạy local và CI.
-- E2E fail block PR merge trên path liên quan.
-
-**Rủi ro và migration.** CI minutes mới — limit cho path liên quan.
+`E2E_BASE_URL` override target nếu dev server chạy chỗ khác (ví dụ trong Docker). Harness có chủ ý **không** wire vào CI — boot cả stack với OSS provider deterministic là follow-up. Scenario gốc "bulk import → run → wait → download zip" depend vào T1.1 (bulk import) chưa land main, là PR riêng. Thêm sau chỉ cần drop spec mới vào `e2e/`.
 
 ---
 

@@ -99,3 +99,8 @@ backups/
 .pytest*
 .cache
 .claude
+
+# Playwright (T3.11)
+frontend/test-results/
+frontend/playwright-report/
+frontend/playwright/.cache/
