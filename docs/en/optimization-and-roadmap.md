@@ -86,28 +86,18 @@ Implemented in `routes_providers.py::preview_arbitrary_text` + `previewRowSynthe
 - Rate-limit reuses the existing token bucket (`RATE_LIMIT_PER_MINUTE`).
 - Frontend: each row in `ScriptEditor` shows a "Preview" button next to the artifact cell. Result is rendered with `<audio controls src=blob:...>` and the blob URL is revoked when the page unmounts.
 
-### 5. Project export bundle
+### 5. Project export bundle — **shipped (export)**
 
-**Why it matters.** A finished project (script + voice mappings + audio + subtitles) is portable content the user wants to back up, share, or move between machines. Today, exporting requires manually downloading each artifact and remembering which voice was used.
+`GET /v1/projects/{key}/export.zip` returns a zip containing:
 
-**What changes.**
+- `metadata.json` — project key, name, schema version, generated-at timestamp, row count.
+- `script.json` — project metadata + every row in `row_index` order with text, provider, voice ID, params, enabled/join flags, and the latest artifact path.
+- `voice-map.json` — `{ "<row_index>": { provider_key, provider_voice_id } }` for rows that have a voice assigned.
+- `audio/<idx>_<safe-title>.<ext>` — every row whose artifact actually exists on disk. Missing artifacts are skipped silently.
 
-- New endpoint `GET /v1/projects/{key}/export` that returns a zip containing:
-  - `script.json` — full row dump, including `text`, `voice`, `speaker`, ordering.
-  - `voice-map.json` — speaker-to-voice-key mapping (resolved against the catalog at export time).
-  - `original.txt` / `original.csv` — the file that was imported (if any), preserved verbatim.
-  - `audio/` — every successful artifact, named per the convention from #1.
-  - `subtitles/` — matching `.srt` files (when #3 ships).
-  - `metadata.json` — project ID, title, created/updated timestamps, schema version.
-- Reverse: `POST /v1/projects/import` accepts the same zip and recreates the project (idempotent on `project_key`; existing artifacts are reused).
+The merge panel exposes an "Export project (.zip)" button next to "Merge completed".
 
-**Acceptance criteria.**
-
-- Export of a 50-row project produces a single zip containing all rows, all audio, and the voice map.
-- Importing the zip on a fresh install recreates the project with the same rows in the same order.
-- Round-trip (export → import → export) produces byte-identical script.json and voice-map.json.
-
-**Risk and migration.** Pure addition. The export schema is part of the public contract; bumps require a CHANGELOG entry.
+`subtitles/` and the original imported TXT/CSV are still on the wishlist (they depend on T1.3 / T1.1 changes that haven't merged yet) and will be added when those land. The companion `POST /v1/projects/import` is the natural follow-up — `script.json` already encodes everything needed for a round-trip recreate.
 
 ---
 

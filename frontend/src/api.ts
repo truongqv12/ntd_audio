@@ -370,6 +370,15 @@ export async function purgeRetention(olderThanDays: number): Promise<RetentionPr
   return response.json();
 }
 
+export async function downloadProjectExport(projectKey: string): Promise<Blob> {
+  const response = await apiFetch(`/projects/${projectKey}/export.zip`);
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(text || "Unable to export project");
+  }
+  return response.blob();
+}
+
 export async function fetchHealth(): Promise<HealthResponse> {
   const response = await apiFetch(`/health`);
   if (!response.ok) throw new Error("Unable to fetch health");
