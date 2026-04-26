@@ -74,7 +74,7 @@ def record_job_event(reason: str, provider_key: str | None = None) -> None:
     # Clamp to ≥ 0. If a terminal event arrives for a job whose creation we
     # never observed (e.g. an old job reaped after a restart), the delta would
     # otherwise drift the gauge negative — meaningless for "in-flight".
-    if jobs_in_flight._value.get() < 0:  # type: ignore[attr-defined]
+    if jobs_in_flight._value.get() < 0:
         jobs_in_flight.set(0)
 
 
