@@ -116,6 +116,7 @@ flowchart TB
 | T2.8 — `write_artifact` flows through `ArtifactStorage` | ✅ | `storage.py::write_artifact`, `services/storage.py::get_storage` |
 | T3.10 — Retention preview/purge (`/v1/admin/retention/{preview,purge}`) | ✅ | `backend/src/voiceforge/services_retention.py`, `routes_retention.py` |
 | T3.9 — Provider plugin entry points (`voiceforge.providers` group) | ✅ | `backend/src/voiceforge/provider_registry.py` |
+| T3.11 — Playwright smoke harness (`npm run test:e2e`) | ✅ | `frontend/playwright.config.ts`, `frontend/e2e/smoke.spec.ts` |
 
 ## Personal-use roadmap (T1+)
 

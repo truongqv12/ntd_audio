@@ -172,22 +172,18 @@ Settings page gains a "Retention" panel with a configurable "older than (days)" 
 
 The UI flow is preview → confirm → delete: the "Delete now" button stays disabled until a non-empty preview is loaded. Active and recent jobs are never touched. The `voiceforge_artifacts_pruned_total` counter and per-status filtering are deliberate follow-ups.
 
-### 11. Playwright smoke E2E
+### 11. Playwright smoke E2E — **shipped (harness)**
 
-**Why it matters.** Vitest covers components in isolation; pytest covers handlers. Neither catches "I imported a CSV, queued the batch, waited via SSE, and the zip download didn't have all the files." One tight smoke scenario catches a wide class of regressions.
+`frontend/playwright.config.ts` plus `frontend/e2e/smoke.spec.ts` ship a Playwright harness with a UI-only smoke that loads the SPA, asserts the brand block is visible, and confirms the sidebar exposes at least three nav items. Run with:
 
-**What changes.**
+```bash
+cd frontend
+npm run test:e2e:install   # one-time chromium download
+npm run dev                # in another shell
+npm run test:e2e
+```
 
-- One scenario: **bulk import → run → wait → download zip**. CSV with 5 rows, two voices, "Conversation" output mode, expect 5 stems + 1 mixdown + 1 SRT in the zip.
-- Run against a stub-provider Compose profile so it doesn't depend on cloud APIs.
-- New CI job `frontend-e2e` on PRs touching `frontend/`, `backend/`, or `engines/`.
-
-**Acceptance criteria.**
-
-- `make e2e` builds the stack, runs the scenario, tears down. Runs locally and in CI.
-- Failing E2E blocks PR merges on the relevant paths.
-
-**Risk and migration.** New CI minutes — limit to relevant paths.
+`E2E_BASE_URL` overrides the target if the dev server runs elsewhere (e.g. inside Docker). The harness is intentionally **not** wired into CI yet — booting the full stack with a deterministic OSS provider belongs in a follow-up. The original "bulk import → run → wait → download zip" scenario depends on T1.1 (bulk import) reaching `main`, which is a separate PR. Adding it later is a matter of dropping a new spec into `e2e/`.
 
 ---
 
