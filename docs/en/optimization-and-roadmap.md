@@ -56,26 +56,17 @@ Concatenation into a single conversation mixdown is already implemented (`merge_
 
 A heavier "Speakers" panel that maps `speaker_label → provider_voice_id` and auto-fills the voice for newly added rows is intentionally deferred. For personal-use one-off scripts, manually setting voice + speaker per row is fine; revisit if it becomes ergonomically painful.
 
-### 3. Subtitle output (.srt / .vtt)
+### 3. Subtitle output (.srt / .vtt) — **shipped**
 
-**Why it matters.** For video creators (the natural audience for this kind of TTS workflow), the audio file alone is half the asset. They want a synchronized subtitle file per row or per conversation, with optional speaker labels for dialogue.
+Implemented in `services_subtitles.py` and exposed at `GET /v1/projects/{key}/rows/subtitles?format=srt|vtt&silence_ms=150&only_completed=true`.
 
-**What changes.**
+- Cue duration is taken from `row.duration_seconds` when present (worker sets it after a successful job). Rows without a duration fall back to `len(text) / SUBTITLE_CHARS_PER_SECOND` (default `15`, configurable via env).
+- Timeline is monotonic: each cue starts where the previous one ended, optionally plus a `silence_ms` gap (defaults to the project's existing merge silence).
+- When a row has a `speaker_label`, the cue text is prefixed `[Anna] Hello there.`.
+- Two ghost buttons in the script editor's merge panel trigger `.srt` / `.vtt` download.
+- 8 pytest cases cover timestamp formatting, duration fallback, speaker prefix, and SRT/VTT body shape.
 
-- New artifact kind: `subtitle` (file extension `.srt`; `.vtt` available via query param on download).
-- For engines that emit timing info (some cloud providers expose phoneme-level or sentence-level timestamps), use that timing directly.
-- For engines that don't, estimate timing from `audio_duration_ms` and `char_count` (uniform char-per-second within the row, with sentence breaks aligned to punctuation).
-- For "Conversation" output mode, the subtitle is one combined `.srt` covering the full mixdown, with each row as a cue and the speaker label (if any) prefixed (`[Anna] Hello there.`).
-- Frontend: subtitle download appears next to audio download on the project page.
-
-**Acceptance criteria.**
-
-- After a successful job, downloading subtitle returns valid SRT (verified against the `srt` parsing library).
-- Conversation mode produces one combined SRT; stems mode produces one SRT per row.
-- For an engine that emits real timestamps (e.g. Google Cloud TTS markup mode), the SRT cue boundaries match what the audio actually says (within a small tolerance).
-- For an engine without timing info, the SRT is at least monotonic and the total duration matches the audio file's duration.
-
-**Risk and migration.** Pure addition. New artifact kind needs an enum migration but no destructive change.
+Sub-row word-level timing (e.g. consuming Google Cloud TTS phoneme timestamps) is intentionally out of scope. The estimator is "good enough" for personal-use video work; consumers that need frame-perfect timing can post-process with their own NLE.
 
 ### 4. Inline single-row preview — **shipped**
 

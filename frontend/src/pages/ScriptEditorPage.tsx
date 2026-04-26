@@ -3,6 +3,7 @@ import {
   artifactUrl,
   downloadProjectArtifactsZip,
   downloadProjectExport,
+  downloadProjectSubtitles,
   fetchProjectRows,
   mergeProjectRows,
   previewRowSynthesis,
@@ -109,6 +110,8 @@ const COPY: Record<Locale, Record<string, string>> = {
     mergeError: "Unable to merge rows",
     exportProject: "Export project (.zip)",
     exportError: "Unable to export project",
+    downloadSubtitles: "Download subtitles",
+    subtitlesError: "Unable to download subtitles",
     reorderUp: "Move up",
     reorderDown: "Move down",
   },
@@ -172,6 +175,8 @@ const COPY: Record<Locale, Record<string, string>> = {
     mergeError: "Không nối được audio",
     exportProject: "Export project (.zip)",
     exportError: "Không export được project",
+    downloadSubtitles: "Tải subtitle",
+    subtitlesError: "Không tải được subtitle",
     reorderUp: "Đưa lên",
     reorderDown: "Đưa xuống",
   },
@@ -625,6 +630,26 @@ export const ScriptEditorPage = memo(function ScriptEditorPage({
     }
   }, [activeProjectKey, copy.exportError]);
 
+  const downloadSubtitles = useCallback(
+    async (fileFormat: "srt" | "vtt") => {
+      try {
+        setError(null);
+        const blob = await downloadProjectSubtitles(activeProjectKey, fileFormat, mergeSilenceMs);
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = `${activeProjectKey}.${fileFormat}`;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        URL.revokeObjectURL(url);
+      } catch {
+        setError(copy.subtitlesError);
+      }
+    },
+    [activeProjectKey, copy.subtitlesError, mergeSilenceMs],
+  );
+
   const handleVoiceSelected = useCallback(
     (voice: VoiceCatalogEntry) => {
       if (!pickerTarget) return;
@@ -1047,6 +1072,20 @@ export const ScriptEditorPage = memo(function ScriptEditorPage({
               </button>
               <button type="button" className="ghost-button" onClick={() => void exportProject()}>
                 {copy.exportProject}
+              </button>
+              <button
+                type="button"
+                className="ghost-button compact-button"
+                onClick={() => void downloadSubtitles("srt")}
+              >
+                {copy.downloadSubtitles} (.srt)
+              </button>
+              <button
+                type="button"
+                className="ghost-button compact-button"
+                onClick={() => void downloadSubtitles("vtt")}
+              >
+                {copy.downloadSubtitles} (.vtt)
               </button>
             </div>
             {masterArtifactUrl ? (

@@ -140,6 +140,7 @@ flowchart TB
 | Tính năng | Trạng thái | Vị trí |
 |---|---|---|
 | T1.2 — `speaker_label` trên script row (dialogue mode tối thiểu) | ✅ | `models.ProjectScriptRow.speaker_label`, alembic `20260424_0004` |
+| T1.3 — Tải subtitle (`.srt` / `.vtt`) | ✅ | `services_subtitles.py`, `routes_project_rows.download_project_subtitles` |
 
 ## Roadmap
 
