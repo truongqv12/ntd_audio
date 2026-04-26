@@ -30,6 +30,7 @@ from .schemas import (
 )
 from .services_app_settings import apply_provider_settings
 from .services_projects import ensure_project, list_projects
+from .services_provider_concurrency import get_provider_semaphore
 from .storage import artifact_absolute_path, write_artifact
 
 logger = logging.getLogger(__name__)
@@ -411,12 +412,13 @@ def process_job(db: Session, job_id: str) -> None:
         return
 
     try:
-        result = provider.synthesize(
-            text=job.source_text,
-            voice_id=job.provider_voice_id,
-            output_format=job.output_format,
-            params=job.normalized_params or {},
-        )
+        with get_provider_semaphore(provider):
+            result = provider.synthesize(
+                text=job.source_text,
+                voice_id=job.provider_voice_id,
+                output_format=job.output_format,
+                params=job.normalized_params or {},
+            )
         relative_path, file_size, sha256_hex = write_artifact(
             provider_key=job.provider_key,
             suffix=result.file_extension,

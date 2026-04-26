@@ -52,6 +52,7 @@ export type ProviderSummary = {
   reachable: boolean;
   reason: string;
   capabilities: ProviderCapabilities;
+  concurrency_limit: number;
 };
 
 export type VoiceCatalogEntry = {

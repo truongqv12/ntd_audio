@@ -123,6 +123,12 @@ flowchart TB
 | T1.4 — On-demand single-row preview (`POST /v1/providers/{key}/preview`) | ✅ | `routes_providers.py::preview_arbitrary_text` |
 
 
+## Personal-use roadmap (T1+)
+
+| Feature | Status | Where |
+|---|---|---|
+| T2.7 — Per-provider concurrency limit (`PROVIDER_CONCURRENCY`) | ✅ | `services_provider_concurrency.py`, `services_jobs.process_job` |
+
 ## Roadmap
 
 For the full rationale, acceptance criteria, and migration notes for each item, see [`optimization-and-roadmap.md`](optimization-and-roadmap.md). The table below is a short index.

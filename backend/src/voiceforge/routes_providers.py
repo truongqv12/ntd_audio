@@ -10,6 +10,7 @@ from .db import get_db
 from .provider_registry import get_provider, list_providers
 from .schemas import ProviderCapabilitiesResponse, ProviderSummaryResponse, VoiceCatalogEntryResponse
 from .services_app_settings import apply_provider_settings
+from .services_provider_concurrency import get_provider_concurrency_limit
 
 router = APIRouter(prefix="/providers", tags=["providers"])
 
@@ -62,6 +63,7 @@ def get_providers(db: Session = Depends(get_db)) -> list[ProviderSummaryResponse
                 reachable=reachable,
                 reason=reason,
                 capabilities=ProviderCapabilitiesResponse(**provider.capabilities.to_dict()),
+                concurrency_limit=get_provider_concurrency_limit(provider.key, provider.category),
             )
         )
     return items
