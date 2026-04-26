@@ -25,6 +25,7 @@ If you are a **human**, start with the root [`../README.md`](../README.md).
 | Providers | [`en/providers.md`](en/providers.md) | [`vi/providers.md`](vi/providers.md) |
 | Development | [`en/development.md`](en/development.md) | [`vi/development.md`](vi/development.md) |
 | Feature map | [`en/feature-map.md`](en/feature-map.md) | [`vi/feature-map.md`](vi/feature-map.md) |
+| Optimization & roadmap | [`en/optimization-and-roadmap.md`](en/optimization-and-roadmap.md) | [`vi/optimization-and-roadmap.md`](vi/optimization-and-roadmap.md) |
 | Design system | [`en/design-system.md`](en/design-system.md) | [`vi/design-system.md`](vi/design-system.md) |
 | Contributing | [`../CONTRIBUTING.md`](../CONTRIBUTING.md) | [`vi/contributing.md`](vi/contributing.md) |
 | Security | [`../SECURITY.md`](../SECURITY.md) | [`vi/security.md`](vi/security.md) |
