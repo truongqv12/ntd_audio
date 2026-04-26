@@ -35,7 +35,7 @@ COMMON_POST_PARAMS = [
         1,
         "dB",
         "Optional post-processing gain. Not applied by every engine.",
-        True,
+        advanced=True,
     ),
 ]
 
@@ -121,7 +121,7 @@ PARAMETER_SCHEMAS: dict[str, list[ProviderParamField]] = {
             1000,
             "Hz",
             "Optional output sample rate. 0 means provider default.",
-            True,
+            advanced=True,
         ),
         ProviderParamField(
             "lowLatencyJourneySynthesis",
@@ -133,7 +133,7 @@ PARAMETER_SCHEMAS: dict[str, list[ProviderParamField]] = {
             None,
             None,
             "Only for Journey voices.",
-            True,
+            advanced=True,
         ),
     ],
     "azure_speech": [
@@ -156,7 +156,7 @@ PARAMETER_SCHEMAS: dict[str, list[ProviderParamField]] = {
             None,
             None,
             "Optional Azure style name if the voice supports it.",
-            True,
+            advanced=True,
         ),
     ],
     "voicevox": [
@@ -169,10 +169,28 @@ PARAMETER_SCHEMAS: dict[str, list[ProviderParamField]] = {
         ),
         ProviderParamField("volumeScale", "Volume scale", "number", 1, 0, 2, 0.05, "x", "VOICEVOX volumeScale."),
         ProviderParamField(
-            "prePhonemeLength", "Pre-phoneme pause", "number", 0.1, 0, 2, 0.05, "s", "Pause before speech.", True
+            "prePhonemeLength",
+            "Pre-phoneme pause",
+            "number",
+            0.1,
+            0,
+            2,
+            0.05,
+            "s",
+            "Pause before speech.",
+            advanced=True,
         ),
         ProviderParamField(
-            "postPhonemeLength", "Post-phoneme pause", "number", 0.1, 0, 2, 0.05, "s", "Pause after speech.", True
+            "postPhonemeLength",
+            "Post-phoneme pause",
+            "number",
+            0.1,
+            0,
+            2,
+            0.05,
+            "s",
+            "Pause after speech.",
+            advanced=True,
         ),
     ],
     "piper": [
@@ -203,7 +221,7 @@ PARAMETER_SCHEMAS: dict[str, list[ProviderParamField]] = {
             1,
             None,
             "Optional speaker id for multi-speaker models.",
-            True,
+            advanced=True,
         ),
     ],
     "kokoro": [
@@ -221,7 +239,7 @@ PARAMETER_SCHEMAS: dict[str, list[ProviderParamField]] = {
             None,
             None,
             "Optional local reference audio for cloning.",
-            True,
+            advanced=True,
         ),
         ProviderParamField(
             "reference_text",
@@ -233,7 +251,7 @@ PARAMETER_SCHEMAS: dict[str, list[ProviderParamField]] = {
             None,
             None,
             "Transcript for reference audio if available.",
-            True,
+            advanced=True,
         ),
     ],
 }
