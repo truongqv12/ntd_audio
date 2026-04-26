@@ -112,6 +112,7 @@ class ProjectScriptRowBase(BaseModel):
     row_index: int
     title: str | None = None
     source_text: str
+    speaker_label: str | None = None
     provider_key: str | None = None
     provider_voice_id: str | None = None
     output_format: str | None = None

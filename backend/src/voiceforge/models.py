@@ -103,6 +103,7 @@ class ProjectScriptRow(Base):
     row_index: Mapped[int] = mapped_column(Integer, nullable=False)
     title: Mapped[str | None] = mapped_column(String(200), nullable=True)
     source_text: Mapped[str] = mapped_column(Text(), nullable=False)
+    speaker_label: Mapped[str | None] = mapped_column(String(80), nullable=True)
     provider_key: Mapped[str | None] = mapped_column(String(50), nullable=True)
     provider_voice_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
     output_format: Mapped[str | None] = mapped_column(String(20), nullable=True)

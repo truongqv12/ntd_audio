@@ -31,6 +31,7 @@ type DraftRow = {
   row_index: number;
   title: string;
   source_text: string;
+  speaker_label: string;
   provider_key: string;
   provider_voice_id: string;
   output_format: string;
@@ -67,6 +68,8 @@ const COPY: Record<Locale, Record<string, string>> = {
     selectedRows: "Selected rows",
     line: "Line",
     titleField: "Title",
+    speakerField: "Speaker",
+    speakerPlaceholder: "Speaker label (optional)",
     text: "Text",
     voice: "Voice",
     format: "Format",
@@ -126,6 +129,8 @@ const COPY: Record<Locale, Record<string, string>> = {
     selectedRows: "Dòng đang chọn",
     line: "Dòng",
     titleField: "Tiêu đề",
+    speakerField: "Speaker",
+    speakerPlaceholder: "Tên speaker (tuỳ chọn)",
     text: "Text",
     voice: "Voice",
     format: "Định dạng",
@@ -174,6 +179,7 @@ function rowFromApi(row: ProjectScriptRow): DraftRow {
     row_index: row.row_index,
     title: row.title ?? "",
     source_text: row.source_text,
+    speaker_label: row.speaker_label ?? "",
     provider_key: row.provider_key ?? "",
     provider_voice_id: row.provider_voice_id ?? "",
     output_format: row.output_format ?? "",
@@ -195,6 +201,7 @@ function emptyRow(index: number): DraftRow {
     row_index: index,
     title: "",
     source_text: "",
+    speaker_label: "",
     provider_key: "",
     provider_voice_id: "",
     output_format: "",
@@ -214,6 +221,7 @@ function payloadRows(rows: DraftRow[]) {
     row_index: row.row_index,
     title: row.title.trim() || undefined,
     source_text: row.source_text,
+    speaker_label: row.speaker_label.trim() || undefined,
     provider_key: row.provider_key || undefined,
     provider_voice_id: row.provider_voice_id || undefined,
     output_format: row.output_format || undefined,
@@ -839,6 +847,14 @@ export const ScriptEditorPage = memo(function ScriptEditorPage({
                             value={row.title}
                             onChange={(event) => updateRow(row.local_id, { title: event.target.value })}
                             placeholder={`Line ${index + 1}`}
+                          />
+                          <input
+                            value={row.speaker_label}
+                            onChange={(event) =>
+                              updateRow(row.local_id, { speaker_label: event.target.value })
+                            }
+                            placeholder={copy.speakerPlaceholder}
+                            style={{ marginTop: "0.25rem" }}
                           />
                         </td>
                         <td className="script-text-cell">

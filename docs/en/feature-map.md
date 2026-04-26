@@ -129,6 +129,12 @@ flowchart TB
 |---|---|---|
 | T2.7 — Per-provider concurrency limit (`PROVIDER_CONCURRENCY`) | ✅ | `services_provider_concurrency.py`, `services_jobs.process_job` |
 
+## Personal-use roadmap (T1+)
+
+| Feature | Status | Where |
+|---|---|---|
+| T1.2 — `speaker_label` on script rows (dialogue mode minimum) | ✅ | `models.ProjectScriptRow.speaker_label`, alembic `20260424_0004` |
+
 ## Roadmap
 
 For the full rationale, acceptance criteria, and migration notes for each item, see [`optimization-and-roadmap.md`](optimization-and-roadmap.md). The table below is a short index.

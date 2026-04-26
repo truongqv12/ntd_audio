@@ -162,6 +162,7 @@ export type ProjectScriptRow = {
   row_index: number;
   title?: string | null;
   source_text: string;
+  speaker_label?: string | null;
   provider_key?: string | null;
   provider_voice_id?: string | null;
   output_format?: string | null;
