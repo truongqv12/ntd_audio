@@ -86,28 +86,18 @@ Triển khai trong `routes_providers.py::preview_arbitrary_text` + helper `previ
 - Rate-limit dùng chung token bucket (`RATE_LIMIT_PER_MINUTE`).
 - Frontend: mỗi row trong `ScriptEditor` có nút "Nghe thử" cạnh ô artifact. Kết quả render qua `<audio controls src=blob:...>`; blob URL được revoke khi unmount.
 
-### 5. Project export bundle
+### 5. Project export bundle — **đã ship (export)**
 
-**Vì sao quan trọng.** Project hoàn thành (script + voice mapping + audio + subtitle) là content portable user muốn backup, share, hoặc move giữa máy. Hôm nay, export yêu cầu tải tay từng artifact và nhớ voice nào đã dùng.
+`GET /v1/projects/{key}/export.zip` trả zip chứa:
 
-**Thay đổi gì.**
+- `metadata.json` — project key, name, schema version, generated-at, row count.
+- `script.json` — metadata project + mọi row theo `row_index` order với text, provider, voice ID, params, flag enabled/join, và artifact path mới nhất.
+- `voice-map.json` — `{ "<row_index>": { provider_key, provider_voice_id } }` cho row đã gán voice.
+- `audio/<idx>_<safe-title>.<ext>` — mọi row có artifact tồn tại trên disk. Artifact thiếu skip silent.
 
-- Endpoint mới `GET /v1/projects/{key}/export` trả zip chứa:
-  - `script.json` — dump full row, gồm `text`, `voice`, `speaker`, ordering.
-  - `voice-map.json` — mapping speaker-to-voice-key (resolve theo catalog tại thời điểm export).
-  - `original.txt` / `original.csv` — file đã import (nếu có), giữ nguyên văn.
-  - `audio/` — mọi artifact thành công, đặt tên theo convention từ #1.
-  - `subtitles/` — file `.srt` tương ứng (khi #3 land).
-  - `metadata.json` — project ID, title, timestamp tạo/update, schema version.
-- Đảo: `POST /v1/projects/import` nhận cùng zip và recreate project (idempotent trên `project_key`; artifact hiện hữu được reuse).
+Panel merge có nút "Export project (.zip)" cạnh "Merge completed".
 
-**Acceptance criteria.**
-
-- Export project 50 row tạo 1 zip chứa mọi row, mọi audio, voice map.
-- Import zip đó trên install mới recreate project với row giống thứ tự.
-- Round-trip (export → import → export) tạo script.json và voice-map.json byte-identical.
-
-**Rủi ro và migration.** Thuần addition. Schema export là phần của contract công khai; bump yêu cầu CHANGELOG entry.
+`subtitles/` và file TXT/CSV gốc vẫn trong wishlist (depend vào T1.3 / T1.1 chưa merge) sẽ thêm khi land. Companion `POST /v1/projects/import` là follow-up tự nhiên — `script.json` đã encode đủ cho round-trip recreate.
 
 ---
 

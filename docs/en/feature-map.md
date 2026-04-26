@@ -117,6 +117,7 @@ flowchart TB
 | T3.10 — Retention preview/purge (`/v1/admin/retention/{preview,purge}`) | ✅ | `backend/src/voiceforge/services_retention.py`, `routes_retention.py` |
 | T3.9 — Provider plugin entry points (`voiceforge.providers` group) | ✅ | `backend/src/voiceforge/provider_registry.py` |
 | T3.11 — Playwright smoke harness (`npm run test:e2e`) | ✅ | `frontend/playwright.config.ts`, `frontend/e2e/smoke.spec.ts` |
+| T1.5 — Project export bundle (`GET /v1/projects/{key}/export.zip`) | ✅ | `services_project_export.py`, `routes_projects.py` |
 
 ## Personal-use roadmap (T1+)
 

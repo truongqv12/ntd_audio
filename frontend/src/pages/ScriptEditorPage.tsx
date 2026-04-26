@@ -2,6 +2,7 @@ import { memo, useCallback, useEffect, useMemo, useState } from "react";
 import {
   artifactUrl,
   downloadProjectArtifactsZip,
+  downloadProjectExport,
   fetchProjectRows,
   mergeProjectRows,
   previewRowSynthesis,
@@ -106,6 +107,8 @@ const COPY: Record<Locale, Record<string, string>> = {
     saveError: "Unable to save project rows",
     queueError: "Unable to queue rows",
     mergeError: "Unable to merge rows",
+    exportProject: "Export project (.zip)",
+    exportError: "Unable to export project",
     reorderUp: "Move up",
     reorderDown: "Move down",
   },
@@ -167,6 +170,8 @@ const COPY: Record<Locale, Record<string, string>> = {
     saveError: "Không lưu được dòng project",
     queueError: "Không queue được dòng",
     mergeError: "Không nối được audio",
+    exportProject: "Export project (.zip)",
+    exportError: "Không export được project",
     reorderUp: "Đưa lên",
     reorderDown: "Đưa xuống",
   },
@@ -603,6 +608,23 @@ export const ScriptEditorPage = memo(function ScriptEditorPage({
     selectedIds,
   ]);
 
+  const exportProject = useCallback(async () => {
+    try {
+      setError(null);
+      const blob = await downloadProjectExport(activeProjectKey);
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `${activeProjectKey}.zip`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+    } catch {
+      setError(copy.exportError);
+    }
+  }, [activeProjectKey, copy.exportError]);
+
   const handleVoiceSelected = useCallback(
     (voice: VoiceCatalogEntry) => {
       if (!pickerTarget) return;
@@ -1022,6 +1044,9 @@ export const ScriptEditorPage = memo(function ScriptEditorPage({
             <div className="script-action-column">
               <button type="button" className="primary-button" onClick={() => void mergeRows()}>
                 {copy.mergeCompleted}
+              </button>
+              <button type="button" className="ghost-button" onClick={() => void exportProject()}>
+                {copy.exportProject}
               </button>
             </div>
             {masterArtifactUrl ? (
