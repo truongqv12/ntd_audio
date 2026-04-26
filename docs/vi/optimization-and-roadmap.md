@@ -113,27 +113,16 @@ Triển khai trong `routes_providers.py::preview_arbitrary_text` + helper `previ
 
 ## Tier 2 — Thích nghi host
 
-### 6. Auto-detect GPU / CPU
+### 6. Auto-detect GPU / CPU — **đã ship**
 
-**Vì sao quan trọng.** Engine OSS (đặc biệt Kokoro và VieNeu) chạy nhanh hơn rõ rệt trên GPU. Hôm nay, user phải tự chọn đúng Compose overlay và tin engine container pick GPU. Không có UI surface báo GPU acceleration có thực sự hoạt động không.
+Triển khai trong `services_system.py`, expose tại `GET /v1/system/capabilities`.
 
-**Thay đổi gì.**
+- Probe chạy `nvidia-smi --query-gpu=name,memory.total --format=csv,noheader,nounits` 1 lần / process (cache theo lifetime container — capability không thay đổi nếu không restart).
+- CPU info dùng `os.sched_getaffinity(0)` khi có (cgroup-aware trên Docker), nếu không thì `os.cpu_count()`.
+- Shape response: `{ gpu: { vendor, name, vram_mb } | null, cpu: { cores, threads }, recommended_overlays: ["docker-compose.gpu.yml"] }`. GPU `null` trên host CPU-only và `recommended_overlays` rỗng.
+- Frontend: Settings page có panel "Host" mới render hardware đã detect cộng câu lệnh `docker compose -f docker-compose.yml -f docker-compose.gpu.yml up -d` chính xác để switch overlay khi có GPU.
 
-- Lúc API startup, probe host:
-  - `nvidia-smi` có sẵn và trả device không?
-  - `/dev/dri` populated không (Intel/AMD)?
-  - `os.cpu_count()` báo gì?
-- Expose ở `GET /v1/system/capabilities` (gate bằng API key khi có): `{ gpu: { vendor, name, vram_mb } | null, cpu: { cores, threads }, recommended_overlays: [...] }`.
-- Per engine container, mở rộng `/healthz` nhỏ báo lại engine load lên device nào (CPU vs CUDA).
-- Frontend: Settings → tab "Host" hiện hardware đã detect và engine nào đang dùng nó. Nếu có GPU nhưng overlay CPU-only đang active, surface hint "switch to GPU overlay" 1-click với câu lệnh `docker compose` chính xác.
-
-**Acceptance criteria.**
-
-- Trên host có NVIDIA GPU, `/v1/system/capabilities` báo đúng.
-- Trên host CPU-only, field GPU là `null` và recommended overlay không gồm variant GPU.
-- Tab Settings → Host match cái engine container thực sự báo.
-
-**Rủi ro và migration.** Thuần addition. Không breaking change.
+Reporting "engine load device nào thực sự" (CPU vs CUDA) từ trong engine container vẫn là extension mở; hiện panel báo cái container API thấy được, đủ verify GPU được mount đúng vào compose project.
 
 ### 7. Concurrency tuning per provider — **đã ship**
 

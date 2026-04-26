@@ -112,6 +112,7 @@ flowchart TB
 | Token-bucket rate limiter | ✅ | `backend/src/voiceforge/rate_limit.py` |
 | Prometheus `/metrics` with single-subscriber metric pipeline | ✅ | `backend/src/voiceforge/observability.py`, `main.py::_metrics_subscriber` |
 | In-flight gauge seeded from DB + clamped to ≥ 0 | ✅ | `main.py::lifespan`, `observability.py::record_job_event` |
+| T2.6 — Host capability probe (`GET /v1/system/capabilities`) | ✅ | `services_system.py`, `routes_system.py`, Settings → Host panel |
 
 ## Personal-use roadmap (T1+)
 

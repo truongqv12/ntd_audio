@@ -2,6 +2,7 @@ import type {
   BulkImportResponse,
   CatalogResponse,
   HealthResponse,
+  HostCapabilities,
   Job,
   LiveSnapshot,
   LogSource,
@@ -335,6 +336,12 @@ export async function downloadProjectArtifactsZip(
     throw new Error(text || "Download failed");
   }
   return response.blob();
+}
+
+export async function fetchHostCapabilities(): Promise<HostCapabilities> {
+  const response = await apiFetch(`/system/capabilities`);
+  if (!response.ok) throw new Error("Unable to fetch host capabilities");
+  return response.json();
 }
 
 export async function fetchHealth(): Promise<HealthResponse> {

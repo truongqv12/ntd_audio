@@ -218,7 +218,16 @@
     "defaultProvider": "Default provider",
     "defaultOutput": "Default output",
     "systemTitle": "System state",
-    "systemDescription": "This page should become the home of diagnostics and environment-level settings."
+    "systemDescription": "This page should become the home of diagnostics and environment-level settings.",
+    "hostTitle": "Host",
+    "hostDescription": "Hardware detected on the API container. Use this to choose the right Docker Compose overlay.",
+    "hostGpu": "GPU",
+    "hostNoGpu": "Not detected",
+    "hostCpu": "CPU",
+    "hostCores": "cores",
+    "hostThreads": "threads",
+    "hostOverlay": "Suggested overlay",
+    "hostLoading": "Probing host…"
   },
   "voiceLab": {
     "title": "Voice Lab",

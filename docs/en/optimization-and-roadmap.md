@@ -113,27 +113,16 @@ Implemented in `routes_providers.py::preview_arbitrary_text` + `previewRowSynthe
 
 ## Tier 2 — Host adaptation
 
-### 6. GPU / CPU auto-detect
+### 6. GPU / CPU auto-detect — **shipped**
 
-**Why it matters.** OSS engines (especially Kokoro and VieNeu) can run dramatically faster on a GPU. Today, the user has to manually pick the right Compose overlay and trust that the engine container picks up the GPU. There's no UI surface that tells you whether GPU acceleration is actually active.
+Implemented in `services_system.py` and exposed at `GET /v1/system/capabilities`.
 
-**What changes.**
+- Probe runs `nvidia-smi --query-gpu=name,memory.total --format=csv,noheader,nounits` once per process (cached for the container's lifetime — capabilities don't change without a restart).
+- CPU info uses `os.sched_getaffinity(0)` when available (cgroup-aware on Docker), otherwise `os.cpu_count()`.
+- Response shape: `{ gpu: { vendor, name, vram_mb } | null, cpu: { cores, threads }, recommended_overlays: ["docker-compose.gpu.yml"] }`. GPU is `null` on CPU-only hosts and `recommended_overlays` is empty.
+- Frontend: Settings page gains a "Host" panel rendering the detected hardware plus the exact `docker compose -f docker-compose.yml -f docker-compose.gpu.yml up -d` command to switch overlay when a GPU is present.
 
-- At API startup, probe the host:
-  - Is `nvidia-smi` available and returning a device?
-  - Is `/dev/dri` populated (Intel/AMD)?
-  - What does `os.cpu_count()` report?
-- Expose at `GET /v1/system/capabilities` (gated by API key when present): `{ gpu: { vendor, name, vram_mb } | null, cpu: { cores, threads }, recommended_overlays: [...] }`.
-- Per-engine container, a small `/healthz` extension that reports back which device the engine actually loaded on (CPU vs CUDA).
-- Frontend: Settings → "Host" tab shows the detected hardware and which engines are using it. If a GPU is present but a CPU-only overlay is active, surface a one-click "switch to GPU overlay" hint with the exact `docker compose` command to run.
-
-**Acceptance criteria.**
-
-- On a host with an NVIDIA GPU, `/v1/system/capabilities` reports it correctly.
-- On a CPU-only host, the GPU field is `null` and the recommended overlays don't include GPU variants.
-- Settings → Host tab matches what the engine containers actually report.
-
-**Risk and migration.** Pure addition. No breaking change.
+Per-engine "which device did I actually load on" reporting (CPU vs CUDA) from inside the engine container is still an open extension; today the panel reports what the API container can see, which is enough to validate that the GPU is correctly mounted into the compose project.
 
 ### 7. Concurrency tuning per provider — **shipped**
 

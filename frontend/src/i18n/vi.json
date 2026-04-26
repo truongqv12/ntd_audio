@@ -218,7 +218,16 @@
     "defaultProvider": "Provider mặc định",
     "defaultOutput": "Định dạng mặc định",
     "systemTitle": "Trạng thái hệ thống",
-    "systemDescription": "Trang này nên trở thành nơi tập trung diagnostics và thiết lập môi trường."
+    "systemDescription": "Trang này nên trở thành nơi tập trung diagnostics và thiết lập môi trường.",
+    "hostTitle": "Máy host",
+    "hostDescription": "Phần cứng đang detect trên container API. Dùng để chọn đúng Compose overlay.",
+    "hostGpu": "GPU",
+    "hostNoGpu": "Không phát hiện",
+    "hostCpu": "CPU",
+    "hostCores": "core",
+    "hostThreads": "thread",
+    "hostOverlay": "Overlay gợi ý",
+    "hostLoading": "Đang probe host…"
   },
   "voiceLab": {
     "title": "Voice Lab",
