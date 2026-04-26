@@ -44,27 +44,17 @@ Implemented in `routes_project_rows.py` + `services_bulk_import.py` + `BulkImpor
 
 Cancel-the-whole-batch and per-row cancel rely on existing per-row queue/cancel infrastructure (Epic 3). Speaker label propagation to subtitles is tracked under #3.
 
-### 2. Multi-voice / dialogue mode
+### 2. Multi-voice / dialogue mode — **shipped (minimum viable)**
 
-**Why it matters.** Today, all rows in a project use one voice (or per-row voice, but with no concept of "speaker"). For a podcast, audio drama, or dialogue scene, the user wants two or more characters speaking, with named speaker tags carrying through to subtitles and exports.
+Per-row voice routing already worked via `provider_voice_id`. This iteration adds the missing piece: a `speaker_label` column on `project_script_rows` plus a small editable field below the title input in the script editor.
 
-**What changes.**
+- Migration `20260424_0004` adds `speaker_label String(80) NULLABLE`. Existing rows keep `NULL`.
+- Schema, `_serialize_row`, and `replace_project_rows` all propagate `speaker_label`.
+- Frontend: `DraftRow` carries `speaker_label`; the title cell now hosts both the title input and a small speaker input below it (placeholder: "Speaker label (optional)" / "Tên speaker (tuỳ chọn)").
 
-- Schema: `project_script_rows.speaker_label` (nullable text — "Anna", "Host", etc.) and `projects.settings.speakers` (a JSON map of `speaker_label → voice_key`).
-- `ScriptEditor` UI: a "Speakers" panel where the user defines `Anna → kokoro:af_heart`, `Host → openai:onyx`. Then in the row editor, picking a speaker auto-fills the voice for that row.
-- Two output modes per project (`projects.settings.output_mode`):
-  - **Stems** (default, current behavior): one audio file per row.
-  - **Conversation**: at the end of a successful batch, the worker concatenates all rows in order with configurable inter-row silence (e.g. 300 ms) into a single mixdown file. The mixdown becomes its own artifact (kind `conversation_mixdown`).
-- Subtitle output (next item) carries the speaker label.
+Concatenation into a single conversation mixdown is already implemented (`merge_project_rows` + ffmpeg), so dialogue mode reuses the existing `join_to_master` flag and the "Merge completed" panel.
 
-**Acceptance criteria.**
-
-- A user can define 2+ speakers, assign rows to speakers, and run the batch.
-- "Stems" mode produces one file per row, named with the speaker label (e.g. `001_anna_hello.wav`).
-- "Conversation" mode produces a single file with rows concatenated in order, plus the per-row stems.
-- Silence-between-rows is configurable per project (`projects.settings.conversation_gap_ms`).
-
-**Risk and migration.** Adds two new schema columns + one settings key. Existing projects: `speaker_label` is null (treated as no-speaker), `output_mode` defaults to `stems` (current behavior).
+A heavier "Speakers" panel that maps `speaker_label → provider_voice_id` and auto-fills the voice for newly added rows is intentionally deferred. For personal-use one-off scripts, manually setting voice + speaker per row is fine; revisit if it becomes ergonomically painful.
 
 ### 3. Subtitle output (.srt / .vtt)
 

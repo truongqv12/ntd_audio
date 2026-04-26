@@ -44,27 +44,17 @@ Triển khai trong `routes_project_rows.py` + `services_bulk_import.py` + `BulkI
 
 Cancel cả batch và cancel từng row dùng hạ tầng queue/cancel có sẵn (Epic 3). Truyền speaker label sang subtitle theo dõi ở #3.
 
-### 2. Multi-voice / dialogue mode
+### 2. Multi-voice / dialogue mode — **đã ship (minimum viable)**
 
-**Vì sao quan trọng.** Hôm nay, tất cả row trong project dùng 1 voice (hoặc voice per-row, nhưng không có concept "speaker"). Cho podcast, audio drama, hoặc cảnh hội thoại, user muốn 2+ nhân vật nói, với speaker tag có tên xuyên suốt subtitle và export.
+Per-row voice routing đã có sẵn qua `provider_voice_id`. Vòng này thêm phần thiếu: cột `speaker_label` trên `project_script_rows` cùng input nhỏ phía dưới ô title trong script editor.
 
-**Thay đổi gì.**
+- Migration `20260424_0004` thêm `speaker_label String(80) NULLABLE`. Row hiện hữu giữ `NULL`.
+- Schema, `_serialize_row`, và `replace_project_rows` đều propagate `speaker_label`.
+- Frontend: `DraftRow` mang `speaker_label`; ô title giờ chứa cả title input và 1 input speaker nhỏ phía dưới (placeholder: "Speaker label (optional)" / "Tên speaker (tuỳ chọn)").
 
-- Schema: `project_script_rows.speaker_label` (text nullable — "Anna", "Host", v.v.) và `projects.settings.speakers` (map JSON `speaker_label → voice_key`).
-- UI `ScriptEditor`: panel "Speakers" cho user định nghĩa `Anna → kokoro:af_heart`, `Host → openai:onyx`. Khi chỉnh row, chọn speaker auto-fill voice cho row đó.
-- Hai output mode per project (`projects.settings.output_mode`):
-  - **Stems** (default, hành vi hiện tại): 1 file audio per row.
-  - **Conversation**: kết thúc batch thành công, worker concat tất cả row theo thứ tự với silence giữa các đoạn cấu hình được (vd 300 ms) thành 1 file mixdown. Mixdown thành artifact riêng (kind `conversation_mixdown`).
-- Subtitle output (mục kế) mang theo speaker label.
+Concat thành 1 mixdown conversation đã có sẵn (`merge_project_rows` + ffmpeg), nên dialogue mode tái dùng flag `join_to_master` và panel "Merge completed" hiện hữu.
 
-**Acceptance criteria.**
-
-- User định nghĩa được 2+ speaker, gán row cho speaker, và chạy batch.
-- Mode "Stems" tạo 1 file per row, đặt tên có speaker label (vd `001_anna_hello.wav`).
-- Mode "Conversation" tạo 1 file ghép row theo thứ tự, plus stem per-row.
-- Silence giữa các row cấu hình được per project (`projects.settings.conversation_gap_ms`).
-
-**Rủi ro và migration.** Thêm 2 cột schema + 1 settings key. Project hiện hữu: `speaker_label` null (xử lý như no-speaker), `output_mode` default `stems` (hành vi hiện tại).
+Panel "Speakers" map `speaker_label → provider_voice_id` và auto-fill voice cho row mới đang cố ý hoãn. Với personal-use script một lần, set tay voice + speaker per row vẫn ổn; revisit nếu thấy bất tiện thật.
 
 ### 3. Subtitle output (.srt / .vtt)
 

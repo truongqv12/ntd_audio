@@ -129,6 +129,12 @@ flowchart TB
 |---|---|---|
 | T2.7 — Concurrency limit per-provider (`PROVIDER_CONCURRENCY`) | ✅ | `services_provider_concurrency.py`, `services_jobs.process_job` |
 
+## Personal-use roadmap (T1+)
+
+| Tính năng | Trạng thái | Vị trí |
+|---|---|---|
+| T1.2 — `speaker_label` trên script row (dialogue mode tối thiểu) | ✅ | `models.ProjectScriptRow.speaker_label`, alembic `20260424_0004` |
+
 ## Roadmap
 
 Rationale đầy đủ, acceptance criteria, và ghi chú migration cho mỗi mục có trong [`optimization-and-roadmap.md`](optimization-and-roadmap.md). Bảng dưới đây là index ngắn.
